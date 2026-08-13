@@ -39,4 +39,3 @@
 {#if tutorial.enabled}<p>New windows are not automatically synced. Sync the windows using the buttons for each section below.</p>{/if}
 <p>To enter fullscreen on your display window, press <span class="key">f key</span> in the display.</p>
 <p>To exit fullscreen, press <span class="key">esc key</span> in the display.</p> 
-<p style:margin-top=50px>To enlarge or minimize text size, use <span class="key">ctrl +</span> and <span class="key">ctrl -</span> respectively.</p>

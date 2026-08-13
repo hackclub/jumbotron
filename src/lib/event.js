@@ -1,7 +1,11 @@
 export let eventName = "Sunbeam" // Used to change the name of the Satellite event across Jumbotron and to make updating the UI between events easier
-
+export let refConsole = [
+    "Starboard",
+    "https://sunbeam.hackclub.com/starboard"
+]
 export function proccessCity(name) {
     name = name.trim();
+    name = name.toLowerCase();
     if (name == "nyc") {
         return "NYC";
     }
