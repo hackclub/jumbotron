@@ -65,7 +65,7 @@
                 console.log("Synced announcement");
             }
 
-            if (localStorage.getItem("jumbotron.ytLink") == "" && localStorage.getItem("jumbotron.fileLink") == "") {
+            if (localStorage.getItem("jumbotron.ytLink") == "" && localStorage.getItem("jumbotron.fileLink") == "" && localStorage.getItem("jumbotron.qrLink") == "") {
                 presentation = "";
                 presentationType = 0;
                 console.log("Cleared presentation");
@@ -73,6 +73,11 @@
             else if (localStorage.getItem("jumbotron.ytLink") != "") {
                 presentationType = 1;
                 presentation = localStorage.getItem("jumbotron.ytLink");
+                //setTimeout(() => {document.getElementById("presentation").requestFullscreen();}, 100)
+            }
+            else if (localStorage.getItem("jumbotron.qrLink") != "") {
+                presentationType = 3;
+                presentation = localStorage.getItem("jumbotron.qrLink");
                 //setTimeout(() => {document.getElementById("presentation").requestFullscreen();}, 100)
             }
             else {
@@ -122,10 +127,13 @@
 <style>
     @font-face {
         font-family: "VAG Rounded Next Shine";
-        src: url("/jumbotron/fonts/Galindo-Regular.ttf");
+        src: url("/fonts/Galindo-Regular.ttf");
         font-weight: 400;
         font-style: normal;
         font-display: swap;
+    }
+    h2 {
+        font-family: VAG Rounded Next Shine, Poppins;
     }
     #event {
         padding: 5px;
@@ -143,7 +151,7 @@
             background-color: rgb(78, 76, 106);
             margin-left: 10px;
             padding: 10px;
-            font-family: VAG Rounded Next Shine;
+            font-family: VAG Rounded Next Shine, Poppins;
         }
         p {
             color: white;
@@ -175,7 +183,7 @@
         border-radius: 25px;
         z-index: 1000;
         h1 {
-                font-family: VAG Rounded Next Shine;
+                font-family: VAG Rounded Next Shine, Montserrat, Poppins;
             }
 
         div {
@@ -221,7 +229,7 @@
             transform: translate(-50%, -50%);
             left: 50%;
             top: 40%;
-            font-family: VAG Rounded Next Shine, Montserrat;
+            font-family: VAG Rounded Next Shine, Montserrat, Poppins;
             color: rgb(67, 33, 65);
                 
         }
@@ -314,6 +322,30 @@
         z-index: 1000;
         height: 10%;
     }
+
+    #qrBlanket {
+        z-index: 1002;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: 0;
+        background-color: white;
+        h2 {
+            position: fixed;
+            transform: translate(-50%, -50%);
+            left: 50%;
+            top: 20%;
+            font-size: 50px;
+        }
+        img {
+            position: fixed;
+            transform: translate(-50%, -50%);
+            left: 50%;
+            top: 50%;
+            z-index: 1003;
+        }
+    }
 </style>
 <svelte:window bind:innerHeight={screenY} bind:innerWidth={screenX}></svelte:window>
 <svelte:head>
@@ -344,6 +376,11 @@
 <iframe transition:blur id="presentation" width={screenX-10} height={screenY-10} src={presentation} title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 {:else if presentationType == 2}
 <iframe id="presentation" src={presentation} width={screenX-10} height={screenY-10} title="Google Docs viewer"></iframe>
+{:else if presentationType == 3}
+<div id="qrBlanket">
+    <h2>Scan this code!</h2>
+    <img src="https://api.qrserver.com/v1/create-qr-code/?data={presentation}&size=450x450" alt="Qr Code"/>
+</div>
 {/if}
 {/if}
 <div id="eventNameDisplay">

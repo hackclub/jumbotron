@@ -13,12 +13,14 @@
     //let googleLink = $state("");
     let fileLink = $state("");
     let ytLink = $state("");
+    let qrLink = $state("");
     let mountedEnabled = $state(false);
 
     onMount(function() {
         //localStorage.setItem("jumbotron.googleLink", "");
         localStorage.setItem("jumbotron.fileLink", "");
         localStorage.setItem("jumbotron.ytLink", "");
+        localStorage.setItem("jumbotron.qrLink", "");
     })
 
     //https://docs.google.com/viewer?url=YOUR_PUBLIC_FILE_URL&embedded=true
@@ -70,6 +72,7 @@
     function enableFile() {
         sync.slides = true;
         localStorage.setItem("jumbotron.ytLink", "");
+        localStorage.setItem("jumbotron.qrLink", "");
         let split = fileLink.split("/");
         let link = `https://drive.google.com/file/d/${split[5]}/preview`
         if (fileLink.indexOf("<iframe src=") != -1) {
@@ -85,6 +88,7 @@
     function enableYoutube() {
         sync.slides = true;
         localStorage.setItem("jumbotron.fileLink", "");
+        localStorage.setItem("jumbotron.qrLink", "");
         //https://www.youtube.com/embed/tB46WSVuWnY
         let link = `https://www.youtube.com/embed/${getYTID(ytLink)}`
         localStorage.setItem("jumbotron.ytLink", link);
@@ -95,11 +99,26 @@
         updateAPI();
     }
 
+    function enableQR() {
+        sync.slides = true;
+        localStorage.setItem("jumbotron.fileLink", "");
+        localStorage.setItem("jumbotron.ytLink", "");
+        //https://www.youtube.com/embed/tB46WSVuWnY
+        let link = qrLink
+        localStorage.setItem("jumbotron.qrLink", link);
+        setTimeout(function() {localStorage.setItem("jumbotron.sync", true); sync.liveshare = true; mountedEnabled = true;}, 2000);
+        setTimeout(function() {sync.slides = false; localStorage.setItem("jumbotron.sync", false); sync.liveshare = false; document.getElementById("file").disabled = false; mountedEnabled = true;}, 3000);
+        liveshareData.presentation = qrLink;
+        //console.log(ytLink);
+        updateAPI();
+    }
+
     function unmountDisplay() {
         sync.slides = true;
         //localStorage.setItem("jumbotron.googleLink", "");
         localStorage.setItem("jumbotron.fileLink", "");
         localStorage.setItem("jumbotron.ytLink", "");
+        localStorage.setItem("jumbotron.qrLink", "");
         mountedEnabled = false;
         setTimeout(function() {localStorage.setItem("jumbotron.sync", true); sync.liveshare = true; mountedEnabled = false;}, 2000);
         setTimeout(function() {localStorage.setItem("jumbotron.sync", false); sync.slides = false; sync.liveshare = false;}, 3000);
@@ -175,7 +194,11 @@
 </style>
 {#if !mountedEnabled}
 <div transition:slide>
-    <p><button class="bigButton" class:toggleOn={consoleMode == 1} onclick={() => {consoleMode == 1 ? consoleMode = 0 : consoleMode = 1}}><span class="material-symbols-outlined" title="Display Google Drive File" translate="no">drive_export</span></button> <button class="bigButton" class:toggleOn={consoleMode == 2} onclick={() => {consoleMode == 2 ? consoleMode = 0 : consoleMode = 2}}><span class="material-symbols-outlined" title="Display YouTube Video" translate="no">video_library</span></button></p>
+    <p>
+        <button class="bigButton" class:toggleOn={consoleMode == 1} onclick={() => {consoleMode == 1 ? consoleMode = 0 : consoleMode = 1}}><span class="material-symbols-outlined" title="Display Google Drive File" translate="no">drive_export</span></button>
+        <button class="bigButton" class:toggleOn={consoleMode == 2} onclick={() => {consoleMode == 2 ? consoleMode = 0 : consoleMode = 2}}><span class="material-symbols-outlined" title="Display YouTube Video" translate="no">video_library</span></button>
+        <button class="bigButton" class:toggleOn={consoleMode == 3} title="Configure QR Code" onclick={() => {consoleMode == 3 ? consoleMode = 0 : consoleMode = 3}}><span translate="no" class="material-symbols-outlined">qr_code</span></button>
+    </p>
 <!--
     <h4>Google Slides</h4>
     {#if tutorial.enabled}<p>To display a Google Slides Presentation on your display windows, go to your Google Slides Presentation, find <i>Publish to Web</i>, choose Embed, copy and then paste the provided link below. You can also copy the entire embed given by Google.</p>{/if}
@@ -209,6 +232,18 @@
             </form>        
             {#if tutorial.enabled}<p>Note that your progression through the video is individual to the display window. Multiple display windows will not progress through the video together.</p>{/if}
             <p><button onclick={enableYoutube} id="youtube" class:disabled={sync.slides}>Display Video on Display Windows</button></p>
+        </div>
+
+    {:else if consoleMode == 3}
+        
+        <div class="subconsole">
+            <h4>QR Code</h4>
+            <p><span class="key">Copy</span> and <span class="key">paste</span> your link below.</p>
+            <form> 
+                <input bind:value={qrLink} class="bigInput" type="url" placeholder="https://hackclub.com...">
+            </form>       
+            {#if tutorial.enabled}<p>Note that your progression through the video is individual to the display window. Multiple display windows will not progress through the video together.</p>{/if}
+            <p><button onclick={enableQR} id="qrcode" class:disabled={sync.slides}>Display QR code on Display Windows</button></p>
         </div>
     {/if}
 </div>

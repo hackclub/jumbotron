@@ -225,6 +225,29 @@
         background-color: white;
         z-index: 0;
     }
+
+    #qrBlanket {
+        z-index: 1002;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: 0;
+        background-color: white;
+        h2 {
+            position: fixed;
+            transform: translate(-50%, -50%);
+            left: 50%;
+            top: 20%;
+            font-size: 50px;
+        }
+        img {
+            position: fixed;
+            transform: translate(-50%, -50%);
+            left: 50%;
+            top: 50%;
+        }
+    }
 </style>
 <svelte:window bind:innerHeight={screenY} bind:innerWidth={screenX}></svelte:window>
 <svelte:head>
@@ -253,6 +276,11 @@
 <iframe transition:blur id="presentation" width={screenX-10} height={screenY-10} src={presentation} title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 {:else if presentationType == 2}
 <iframe id="presentation" src={presentation} width={screenX-10} height={screenY-10} title="Google Docs viewer"></iframe>
+{:else if presentationType == 3}
+<div id="qrBlanket">
+    <h2>Scan this code!</h2>
+    <img src="https://api.qrserver.com/v1/create-qr-code/?data={presentation}&size=300x300" alt="Qr Code"/>
+</div>
 {/if}
 {/if}
 <div id="eventNameDisplay">
