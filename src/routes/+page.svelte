@@ -137,9 +137,9 @@
         border-radius: 0px;
         border: none;
         margin: 0;
-        background-color: rgb(95, 93, 93);
+        background-color: rgb(212, 209, 209);
         p {
-            color: rgb(220, 219, 219);
+            color: rgb(0, 0, 0);
         }
     }
 </style>

@@ -6,7 +6,7 @@ export let refConsole = [
 export function proccessCity(name) {
     name = name.trim();
     name = name.toLowerCase();
-    if (name == "nyc") {
+    if (name == "nyc" || name == "new york city" || name == "new-york-city") {
         return "NYC";
     }
     else if (name == "dallas-fort-worth" || name=="dfw") {

@@ -218,7 +218,7 @@
                 <input bind:value={fileLink} class="bigInput" type="url" placeholder="https://drive.google.com/file...">
             </form>
             {#if tutorial.enabled}<p>Note that your progression through the document is individual to the display window, and you will need to use scroll or arrow keys to navigate the document. Multiple display windows will not progress through the document together.</p>{/if}
-            <p><button onclick={enableFile} id="file" class:disabled={sync.slides}>Display File on Display Windows</button></p>
+            <p><button onclick={enableFile} id="file" class:disabled={sync.slides} class:incomplete={fileLink.length == 0} disabled={sync.slides || fileLink.length == 0}>Display File on Display Windows</button></p>
         </div>
 
     {:else if consoleMode == 2}
@@ -231,7 +231,7 @@
                 <input bind:value={ytLink} class="bigInput" type="url" placeholder="https://www.youtube.com/watch...">
             </form>        
             {#if tutorial.enabled}<p>Note that your progression through the video is individual to the display window. Multiple display windows will not progress through the video together.</p>{/if}
-            <p><button onclick={enableYoutube} id="youtube" class:disabled={sync.slides}>Display Video on Display Windows</button></p>
+            <p><button onclick={enableYoutube} id="youtube" class:disabled={sync.slides} class:incomplete={ytLink.length == 0} disabled={sync.slides || ytLink.length == 0}>Display Video on Display Windows</button></p>
         </div>
 
     {:else if consoleMode == 3}
@@ -243,7 +243,7 @@
                 <input bind:value={qrLink} class="bigInput" type="url" placeholder="https://hackclub.com...">
             </form>       
             {#if tutorial.enabled}<p>Note that your progression through the video is individual to the display window. Multiple display windows will not progress through the video together.</p>{/if}
-            <p><button onclick={enableQR} id="qrcode" class:disabled={sync.slides}>Display QR code on Display Windows</button></p>
+            <p><button onclick={enableQR} id="qrcode" class:disabled={sync.slides} class:incomplete={qrLink.length == 0} disabled={sync.slides || qrLink.length == 0}>Display QR code on Display Windows</button></p>
         </div>
     {/if}
 </div>

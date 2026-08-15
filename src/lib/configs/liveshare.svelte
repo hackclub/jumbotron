@@ -78,7 +78,8 @@
     <p><button class="bigButton" onclick={enableLive}><span translate="no" title="Enable Liveshare" class="material-symbols-outlined">cast</span></button></p>
 </div>
 {:else}
-<p>Liveshare is enabled. Participants can head to <a href="https://jumbotron.hackclub.com/{cityName}">jumbotron.hackclub.com/{cityName}</a> or find the link on your event's homepage at <a href="https://{eventName.toLowerCase()}.hackclub.com">{eventName.toLowerCase()}.hackclub.com</a></p>
+<p>Liveshare is enabled. Participants can head to <span class="key">jumbotron.hackclub.com/{cityName}</span></p>
+<p><strong>Hack Club's Code of Conduct applies to all platforms. Please be mindful of your usage of Jumbotron's servers, and what you upload to them.</strong></p>
 <p>{#if !openGate.paused}<button onclick={pause}>Pause Liveshare</button>{:else}<button onclick={unpause}>Unpause Liveshare</button>{/if} <button onclick={destroy}>End Liveshare</button></p>
 {#if openGate.paused}<p><i>Liveshare will still display as active to participants while paused; data will not be update</i>d</p>{/if}
 {/if}

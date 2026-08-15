@@ -30,6 +30,10 @@ form {
   width: 80%;
 }
 
+button.incomplete {
+      cursor: not-allowed
+  }
+
 button.bigButton {
   padding: 15px;
   font-size: 30px;
