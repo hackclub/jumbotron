@@ -2,8 +2,19 @@
     import { onMount } from "svelte";
     import { liveshareData, openGate, startAPI, updateAPI } from "$lib/liveshare.svelte.js";
     import {eventName} from "$lib/event.js";
+    import { slide } from "svelte/transition";
 
     let ping;
+
+    let forceUpdateTimer = $state(0);
+    onMount(() => {
+        setInterval(() => {
+            if (forceUpdateTimer > 0) {
+                forceUpdateTimer--;
+            }
+        }, 5000);
+    })
+
 
     let paused = $state(false);
 
@@ -70,6 +81,9 @@
     button {
         background-color: rgb(92, 89, 89);
     }
+    .wait:hover {
+        cursor: not-allowed;
+    }
 </style>
 
 {#if !openGate.isOpen && paused == false}
@@ -79,7 +93,12 @@
 </div>
 {:else}
 <p>Liveshare is enabled. Participants can head to <span class="key">jumbotron.hackclub.com/{cityName}</span></p>
-<p><strong>Hack Club's Code of Conduct applies to all platforms. Please be mindful of your usage of Jumbotron's servers, and what you upload to them.</strong></p>
-<p>{#if !openGate.paused}<button onclick={pause}>Pause Liveshare</button>{:else}<button onclick={unpause}>Unpause Liveshare</button>{/if} <button onclick={destroy}>End Liveshare</button></p>
+
+<div class="subconsole">
+    <p>{#if !openGate.paused}<button onclick={() => {updateAPI(); forceUpdateTimer = 3;}} disabled={forceUpdateTimer > 0} class:wait={forceUpdateTimer > 0}>Force Update</button> <button onclick={pause}>Pause Liveshare</button>{:else}<button onclick={unpause}>Unpause Liveshare</button>{/if} <button onclick={destroy}>End Liveshare</button></p>
+    <p>When sharing files, websites, or videos, participants have unrestricted access.</p>
+
+</div>
 {#if openGate.paused}<p><i>Liveshare will still display as active to participants while paused; data will not be update</i>d</p>{/if}
+{#if forceUpdateTimer > 0}<p transition:slide><strong><i>Force update can be used every 15 seconds</i></strong></p>{:else}<p>Liveshare should update automatically; however, you can use <strong>Force Update</strong> if needed</p>{/if}
 {/if}

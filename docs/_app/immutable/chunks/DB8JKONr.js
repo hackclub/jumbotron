@@ -1,0 +1,1 @@
+import{Q as e}from"./2Mtg-0E7.js";e();

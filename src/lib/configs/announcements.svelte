@@ -431,9 +431,9 @@
                         <input bind:value={eventsTitle} type="text" placeholder="Title">
                         <!--<input bind:value={eventsTime} type="time" placeholder={placeholderTime}>-->
                         
-                        <input type="number" min=0 max={pmMax} class="box" id="number1" placeholder={placeholderTime.split(":")[0]} bind:value={eventTimeInput[0]}>
+                        <input type="number" min=0 max={pmMax} onblur={sanitizeTime} class="box" id="number1" placeholder={placeholderTime.split(":")[0]} bind:value={eventTimeInput[0]}>
                         <span>:</span>
-                        <input type="number" min=0 max=59 class="box" class:pushLeft={formatLabel == "International"} id="number2" placeholder={placeholderTime.split(":")[1]} bind:value={eventTimeInput[1]}>
+                        <input type="number" min=0 max=59 class="box" onblur={sanitizeTime} class:pushLeft={formatLabel == "International"} id="number2" placeholder={placeholderTime.split(":")[1]} bind:value={eventTimeInput[1]}>
                         {#if formatLabel == "AM/PM"}
                         <button type="button" class="box option" onclick={() => {pmString == "AM" ? pmString = "PM" : pmString = "AM"}}>{pmString}</button>
                         {/if}
