@@ -3,13 +3,20 @@ export const openGate = $state({
 });
 
 export const liveshareData = $state({
-    active: false
+    active: false,
+    timestamp: timestamp()
 });
+
+function timestamp() {
+    let clock = new Date();
+    return clock.getTime();
+}
 
 export async function updateAPI() {
     if (!openGate.isOpen) {
         return;
     }
+    liveshareData.timestamp = timestamp();
     let val = await fetch("https://api.jumbotron.hackclub.com/mutate", {
         method: "POST",
         headers: {
@@ -30,6 +37,7 @@ export async function updateAPI() {
 }
 
 export async function startAPI() {
+    liveshareData.timestamp = timestamp();
     let val = await fetch("https://api.jumbotron.hackclub.com/mutate", {
         method: "POST",
         headers: {

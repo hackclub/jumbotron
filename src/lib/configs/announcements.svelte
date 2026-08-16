@@ -448,7 +448,7 @@
                         <button disabled={sync.announcements} class="option" onclick={switchFormat}>Displaying International Format</button>
                         {/if}-->
                         <br>
-                        {#if !eventOn}<button disabled={sync.announcements || eventsTitle == "" || eventTimeInput[0] === "" || eventTimeInput[1] === ""} onclick={function() {sanitizeTime(); toggle(1);}} class:disabled={sync.announcements} class:incomplete={eventsTitle === "" || eventTimeInput[0] === "" || eventTimeInput[1] === ""}>Display Event</button>{:else}<button disabled={sync.announcements} onclick={function() {toggle(1);}} class:disabled={sync.announcements}>Hide Event</button> <button disabled={sync.announcements} onclick={function() { sanitizeTime(); update(1)}} class:disabled={sync.announcements}>Sync Event</button>{/if}
+                        {#if !eventOn}<button disabled={sync.announcements || eventsTitle == "" || eventTimeInput[0] === "" || eventTimeInput[1] === ""} onclick={function() {sanitizeTime(); toggle(1);}} class:disabled={sync.announcements} class:incomplete={eventsTitle === "" || eventTimeInput[0] === "" || eventTimeInput[1] === ""}>Display Event</button>{:else}<button disabled={sync.announcements} onclick={function() { sanitizeTime(); update(1)}} class:disabled={sync.announcements}>Sync Event</button> <button disabled={sync.announcements} onclick={function() {toggle(1);}} class:disabled={sync.announcements}>Hide Event</button>{/if}
                     </form>
                 </div>
             </td>

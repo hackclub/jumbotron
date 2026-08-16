@@ -11,6 +11,22 @@
 
     let p2 = $state("We're checking if Liveshare is enabled for this event.");
 
+    function checkTime() {
+        if (!boxes.timestamp) {
+            return;
+        }
+        let clock = new Date();
+        let curr = clock.getTime();
+        let diff = curr - boxes.timestamp;
+        let diffMinutes = (diff/1000)/60;
+        if (diffMinutes > 10) {
+            if (p2 == "Liveshare is enabled. You should see active notifications for events, presentations, videos, and announcements below.") {
+                p2 = "Liveshare is enabled; however, it has been more than 10 minutes since an update. This may not be active right now, but you should see active notifications for events, presentations, videos, and announcements below.";
+            }
+        }
+    }
+    setInterval(checkTime, (1000 * 60 * 5));
+
     onMount(async function() {
         console.log("Checking city name...");
         try {

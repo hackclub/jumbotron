@@ -149,7 +149,7 @@
 <div id="participant">
     <p>If you've found this page as a participant, you probably made a mistake. Please see an organizer!</p>
 </div>
-<h1 style:font-size=40px style:margin-top=100px><a title="Visit Hack Club Main Site" href="https://hackclub.com"><image style="max-height:40px; margin: 0; margin-right: -15px; margin-left: 15px;  transform: translateY(5px); padding: 0; display:inline" src="https://assets.hackclub.com/icon-rounded.png"></image></a><span style:font-family="Host Grotesk" style:color="#431d22">Jumbotron</span></h1>
+<a href="/" style:text-decoration="none" title="Main page"><h1 style:font-size=40px style:margin-top=100px><image style="max-height:40px; margin: 0; margin-right: -15px; margin-left: 15px;  transform: translateY(5px); padding: 0; display:inline" src="https://assets.hackclub.com/icon-rounded.png"></image><span style:font-family="Host Grotesk" style:color="#431d22">Jumbotron</span></h1></a>
 <p><i>Keeping your event communications in one console</i></p>
 <h2 style:font-size=20px style:margin-top=20px style:margin-bottom=40px>Organizer Landing Page</h2>
 {#if liveshareError == null}
