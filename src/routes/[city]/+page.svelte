@@ -25,6 +25,7 @@
             }
         }
     }
+    checkTime();
     setInterval(checkTime, (1000 * 60 * 5));
 
     onMount(async function() {
