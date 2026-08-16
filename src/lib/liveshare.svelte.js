@@ -10,7 +10,7 @@ export async function updateAPI() {
     if (!openGate.isOpen) {
         return;
     }
-    let val = await fetch("https://jumbotron.lynn89sudo.hackclub.app/mutate", {
+    let val = await fetch("https://api.jumbotron.hackclub.com/mutate", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -30,7 +30,7 @@ export async function updateAPI() {
 }
 
 export async function startAPI() {
-    let val = await fetch("https://jumbotron.lynn89sudo.hackclub.app/mutate", {
+    let val = await fetch("https://api.jumbotron.hackclub.com/mutate", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"

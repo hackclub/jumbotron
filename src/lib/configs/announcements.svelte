@@ -21,6 +21,7 @@
         let clock = new Date();
         eventTimeInput[0] = clock.getHours();
         eventTimeInput[1] = clock.getMinutes();
+        sanitizeTime();
     }
 
     let time = new Date();
@@ -143,6 +144,7 @@
             // 12 AM -> 0 (Midnight)
             eventTimeInput[0] = 0;
         }
+        sanitizeTime();
     } else {
         // Switch to AM/PM (12-Hour)
         formatLabel = "AM/PM";

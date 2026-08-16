@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
 
     // Global configurations
-    let apiBase = $state("https://jumbotron.lynn89sudo.hackclub.app");
+    let apiBase = $state("https://api.jumbotron.hackclub.com");
     let masterKey = $state("");
 
     onMount(() => {

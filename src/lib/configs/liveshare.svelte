@@ -30,7 +30,7 @@
     })
 
     function sendDisconnectBeacon() {
-        const url = "https://jumbotron.lynn89sudo.hackclub.app/mutate";
+        const url = "https://api.jumbotron.hackclub.com/mutate";
         
         // Convert your structured data into standard URL-encoded form properties
         const params = new URLSearchParams();

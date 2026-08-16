@@ -26,7 +26,7 @@
             return;
         }
 
-        let eventSource = new EventSource(`https://jumbotron.lynn89sudo.hackclub.app/stream?cityName=${proccessCity(page.params.city)}`);
+        let eventSource = new EventSource(`https://api.jumbotron.hackclub.com/stream?cityName=${proccessCity(page.params.city)}`);
         eventSource.onmessage = (event) => {
             const parsed = JSON.parse(event.data);
             if (parsed && !parsed.message) {
@@ -44,7 +44,7 @@
         };
 
         try {
-            let raw = await fetch(`https://jumbotron.lynn89sudo.hackclub.app/data?eventName=${cityLink}`);
+            let raw = await fetch(`https://api.jumbotron.hackclub.com/data?eventName=${cityLink}`);
             let liveshare = await raw.json();
             console.log(liveshare);
             if (liveshare.data.active == true) {

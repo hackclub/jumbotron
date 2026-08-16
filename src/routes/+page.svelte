@@ -14,7 +14,7 @@
     onMount(async () => {
         let urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("code") != null) {
-            let val = await fetch("https://jumbotron.lynn89sudo.hackclub.app/createSession", {
+            let val = await fetch("https://api.jumbotron.hackclub.com/createSession", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

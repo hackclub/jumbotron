@@ -39,7 +39,7 @@ export function proccessEventCity(name) {
 }
 
 export async function checkCity(name) {
-    let rawData = await fetch(`https://jumbotron.lynn89sudo.hackclub.app/data?eventName=${proccessCity(name)}`);
+    let rawData = await fetch(`https://api.jumbotron.hackclub.com/data?eventName=${proccessCity(name)}`);
     if (!rawData.ok) {
         console.log("Failed")
         return false;
