@@ -24,7 +24,7 @@
         if (sessionStorage.getItem("liveshareKey") == null || sessionStorage.getItem("liveshareKey") == "" || sessionStorage.getItem("liveshareEmail") == null || sessionStorage.getItem("liveshareEmail") == "") {
             return;
         }  
-        startAPI();
+        //startAPI();
 
         window.addEventListener("pagehide", sendDisconnectBeacon);
     })
@@ -32,18 +32,24 @@
     function sendDisconnectBeacon() {
         const url = "https://api.jumbotron.hackclub.com/mutate";
         
-        // Convert your structured data into standard URL-encoded form properties
-        const params = new URLSearchParams();
-        params.append("auth", JSON.stringify({
-            emailAddress: sessionStorage.getItem("liveshareEmail"), 
-            key: sessionStorage.getItem("liveshareKey")
-        }));
-        params.append("cityName", cityName);
-        params.append("data", JSON.stringify({ active: false }));
-        
-        // This sends as application/x-www-form-urlencoded naturally, bypassing preflights
-        const success = navigator.sendBeacon(url, params);
-        console.log("Beacon queued via URLSearchParams:", success); 
+        const emailAddress = sessionStorage.getItem("liveshareEmail");
+        const key = sessionStorage.getItem("liveshareKey");
+
+        if (!emailAddress || !key || !cityName) return;
+
+        const payload = JSON.stringify({
+            auth: {
+                emailAddress: emailAddress,
+                key: key
+            },
+            cityName: cityName,
+            data: { active: false }
+        });
+
+        // Send as plain text blob to bypass preflight and trigger server JSON parsing
+        const blob = new Blob([payload], { type: "text/plain" });
+        const success = navigator.sendBeacon(url, blob);
+        console.log("Beacon queued via JSON Blob:", success); 
     }
 
     function enableLive() {
@@ -54,7 +60,7 @@
         openGate.paused = false;
         paused = false;
         liveshareData.active = true;
-        updateAPI();
+        startAPI();
         setTimeout(() => {sendDisconnectBeacon()}, 6000);
     }
 
