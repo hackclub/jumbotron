@@ -182,7 +182,7 @@
     {#if !boxes.presentation && !boxes.event && !boxes.announcement && p2.indexOf("checking") == -1}
         <div class="box" transition:blur>
             <h3><i>There are no items currently displayed</i></h3>
-            <p>This page will update automatically.</p>
+            <p>Notifications will appear here when synced or updated.</p>
         </div>
     {/if}
 </div>
