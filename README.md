@@ -6,6 +6,25 @@ Welcome to Jumbotron! Jumbotron is a too built on SvelteKit and Node that can be
 
 Jumbotron is a static SvelteKit project that works through a web browser and two screens
 
+## Running the front-end locally
+
+Open the project and run the following
+- npm install
+- npm run dev
+
+You should be able to preview the front-end locally
+
+To build changes for proper deployment, run
+- npm run build
+- Delete the folder called "docs", and rename the new "build" folder
+- git to push changes
+
+## Running the back-end locally
+The backend is available at /hackclub/jumbotron-backend
+Open it locally and run "node index.js" to start it
+
+Important to note is that you may need to create your own auth app and redirect URL, as you cannot directly use Jumbotron's
+
 ## How to use Jumbotron as an Event Participant
 
 If Liveshare is enabled, you can use it by heading to jumbotron.hackclub.com/[eventName]. For example
