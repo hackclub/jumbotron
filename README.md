@@ -6,7 +6,7 @@ Welcome to Jumbotron! Jumbotron is a too built on SvelteKit and Node that can be
 
 Jumbotron is a static SvelteKit project that works through a web browser and two screens
 
-## Running the front-end locally
+### Running the front-end locally
 
 Open the project and run the following
 - npm install
@@ -19,7 +19,7 @@ To build changes for proper deployment, run
 - Delete the folder called "docs", and rename the new "build" folder
 - git to push changes
 
-## Running the back-end locally
+### Running the back-end locally
 The backend is available at /hackclub/jumbotron-backend
 Open it locally and run "node index.js" to start it
 
