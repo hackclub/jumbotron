@@ -18,15 +18,26 @@
         let clock = new Date();
         let curr = clock.getTime();
         let diff = curr - boxes.timestamp;
+        //console.log(boxes.timestamp, curr);
         let diffMinutes = (diff/1000)/60;
+        //console.log(diff, diffMinutes);
+        if (diffMinutes > 13) {
+            if (p2 == "Liveshare is enabled. You should see active notifications for events, presentations, videos, and announcements below.") {
+                p2 = "Liveshare is enabled; however, it has not been recently updated. These are the most recent notifications for events, presentations, videos, and announcements.";
+            }
+        }
+        if (diffMinutes > 20) {
+            if (p2 == "Liveshare is enabled. You should see active notifications for events, presentations, videos, and announcements below.") {
+                p2 = "Liveshare is enabled; however, it has been more than 20 minutes since an update. This may not be active right now, but you should see notifications for events, presentations, videos, and announcements below.";
+            }
+        }
         if (diffMinutes > 10) {
             if (p2 == "Liveshare is enabled. You should see active notifications for events, presentations, videos, and announcements below.") {
-                p2 = "Liveshare is enabled; however, it has been more than 10 minutes since an update. This may not be active right now, but you should see active notifications for events, presentations, videos, and announcements below.";
+                p2 = "Liveshare is enabled; however, it has been more than 10 minutes since an update. This may not be active right now, but you should see notifications for events, presentations, videos, and announcements below.";
             }
         }
     }
-    checkTime();
-    setInterval(checkTime, (1000 * 60 * 5));
+    setInterval(checkTime, (1000 * 60));
 
     onMount(async function() {
         console.log("Checking city name...");
@@ -67,10 +78,12 @@
             if (liveshare.data.active == true) {
                 p2 = "Liveshare is enabled. You should see active notifications for events, presentations, videos, and announcements below.";
                 boxes = liveshare.data;
+                checkTime();
             } else {
                 p2 = "Liveshare is not currently enabled for this event; it is available, and can be enabled by an organizer. Reload this page once an organizer activates Liveshare.";
             }
         } catch(err) {
+            console.log(err);
             p2 = "Your event was found; however, there was an error with finding the Liveshare information. See an organizer if you need Liveshare.";
         }
     });
@@ -164,6 +177,12 @@
                     </button>
                 </p>
             {/if}
+        </div>
+    {/if}
+    {#if !boxes.presentation && !boxes.event && !boxes.announcement && p2.indexOf("checking") == -1}
+        <div class="box" transition:blur>
+            <h3><i>There are no items currently displayed</i></h3>
+            <p>This page will update automatically.</p>
         </div>
     {/if}
 </div>
