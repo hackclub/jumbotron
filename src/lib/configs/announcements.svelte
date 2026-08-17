@@ -21,7 +21,6 @@
         let clock = new Date();
         eventTimeInput[0] = clock.getHours();
         eventTimeInput[1] = clock.getMinutes();
-        sanitizeTime();
     }
 
     let time = new Date();
@@ -34,6 +33,7 @@
         if (clock.getHours() >= 12) {
             pmString = "PM";
         }
+        sanitizeTime();
     })
 
     let timerID = "";
@@ -97,6 +97,9 @@
     }
 
     function sanitizeTime() {
+        if (parseInt(eventTimeInput[0]) == 0 && formatLabel == "AM/PM" && pmString == "AM") {
+            eventTimeInput[0] = 12;
+        }
         if (eventTimeInput[0] < 0) {
             eventTimeInput[0] = 12;
         }
@@ -128,6 +131,7 @@
                 eventTimeInput[1] = "0" + eventTimeInput[1];
             }
         }
+        
     }
 
     let formatLabel = $state("International")
@@ -165,6 +169,7 @@
             // 1:xx to 11:xx -> 1:xx AM to 11:xx AM
             pmString = "AM";
         }
+        sanitizeTime();
     }
 }
 
@@ -433,7 +438,7 @@
                         <input bind:value={eventsTitle} type="text" placeholder="Title">
                         <!--<input bind:value={eventsTime} type="time" placeholder={placeholderTime}>-->
                         
-                        <input type="number" min=0 max={pmMax} onblur={sanitizeTime} class="box" id="number1" placeholder={placeholderTime.split(":")[0]} bind:value={eventTimeInput[0]}>
+                        <input type="number" min={pmMax == 12 ? 1 : 0} max={pmMax} onblur={sanitizeTime} class="box" id="number1" placeholder={placeholderTime.split(":")[0]} bind:value={eventTimeInput[0]}>
                         <span>:</span>
                         <input type="number" min=0 max=59 class="box" onblur={sanitizeTime} class:pushLeft={formatLabel == "International"} id="number2" placeholder={placeholderTime.split(":")[1]} bind:value={eventTimeInput[1]}>
                         {#if formatLabel == "AM/PM"}
