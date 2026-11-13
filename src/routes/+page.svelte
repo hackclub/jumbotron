@@ -43,7 +43,9 @@
             const data = await response.json().catch(() => ({}));
             if (!response.ok || data.error) {
                 status = "error";
-                errorText = `No event uses code ${value}. Check the code on the screen, or ask an organizer.`;
+                errorText = response.status === 429
+                    ? data.error || "Too many wrong codes. Wait a few minutes and try again."
+                    : `No event uses code ${value}. Check the code on the screen, or ask an organizer.`;
                 return { ok: false };
             }
             sessionStorage.setItem("eventPacket", JSON.stringify(data));

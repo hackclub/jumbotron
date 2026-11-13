@@ -13,7 +13,7 @@
     // Approving someone while another presenter is on takes the screen from them.
     let screenBusy = $derived(!!demo.presenter);
 
-    // Pairing a venue computer: a 6-digit code it types at /screen, good for 10 minutes.
+    // Pairing a venue computer: an 8-digit code it types at /screen, good for 10 minutes.
     let pairing = $state(null);   // { pairCode, expires } while a code is showing
     let pairNow = $state(Date.now());
     let pairNote = $state("");
@@ -72,7 +72,7 @@
         {#if pairing}
             <div class="pair-code" transition:slide={{ duration: 180 }}>
                 <span class="pair-label">On the venue computer, open <span class="mono">jumbotron.hackclub.com/screen</span> and type</span>
-                <strong class="mono" translate="no">{pairing.pairCode.slice(0, 3)} {pairing.pairCode.slice(3)}</strong>
+                <strong class="mono" translate="no">{pairing.pairCode.slice(0, 4)} {pairing.pairCode.slice(4)}</strong>
                 <span class="pair-label">Works once · expires in {minutes(pairLeft)}</span>
                 <span class="pair-actions">
                     <button class="btn btn-small btn-quiet" onclick={() => (pairing = null)}>Done</button>

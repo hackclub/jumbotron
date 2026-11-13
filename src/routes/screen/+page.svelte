@@ -3,7 +3,7 @@
     // what's up next (when the board is on); during demo time it shows the code to type, then the
     // presenter's screen.
     // Opened from the console, it signs in with the organizer credentials saved on this device.
-    // A venue computer nobody signs in on is paired instead: the console shows a 6-digit code,
+    // A venue computer nobody signs in on is paired instead: the console shows an 8-digit code,
     // typed here once, and the screen key it unlocks is kept in this browser.
     import { resolve } from "$app/paths";
     import { onMount } from "svelte";
@@ -368,8 +368,8 @@
     async function pair(event) {
         event.preventDefault();
         const typed = pairCode.replace(/\D/g, "");
-        if (typed.length !== 6) {
-            pairError = "Type all 6 digits.";
+        if (typed.length !== 8) {
+            pairError = "Type all 8 digits.";
             return;
         }
         pairing = true;
@@ -467,7 +467,7 @@
         {:else}
             <h1>Pair this screen</h1>
             {#if unpairedNote}<p class="note" role="status">{unpairedNote}</p>{/if}
-            <p>In the organizer console, open <strong>Big screen</strong>, choose <strong>Pair a computer</strong>, and type the 6-digit code here. Nobody has to sign in on this computer.</p>
+            <p>In the organizer console, open <strong>Big screen</strong>, choose <strong>Pair a computer</strong>, and type the 8-digit code here. Nobody has to sign in on this computer.</p>
             <form class="pair" onsubmit={pair}>
                 <label class="sr-only" for="pair-code">Pairing code</label>
                 <input
@@ -476,8 +476,8 @@
                     bind:value={pairCode}
                     inputmode="numeric"
                     autocomplete="one-time-code"
-                    maxlength="7"
-                    placeholder="000000"
+                    maxlength="9"
+                    placeholder="0000 0000"
                     aria-invalid={!!pairError}
                     aria-describedby={pairError ? "pair-error" : undefined}
                 />
