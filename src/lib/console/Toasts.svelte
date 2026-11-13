@@ -19,12 +19,12 @@
         <div class="toast error" role="alert" transition:fly={{ y: 24, duration: 260 }}>
             <span class="icon" translate="no" aria-hidden="true">error</span>
             <p>{syncStatus.message}</p>
-            <button class="btn btn-small btn-primary" onclick={updateAPI}>Try again</button>
+            <button class="btn btn-small btn-primary" onclick={() => updateAPI()}>Try again</button>
         </div>
     {/if}
     {#if undoState.key}
         <div class="toast" transition:fly={{ y: 24, duration: 260 }}>
-            <p>{labelFor(undoState.key)} is no longer showing.</p>
+            <p>{undoState.label || labelFor(undoState.key)} {undoState.label === "Announcements" ? "are" : "is"} no longer showing.</p>
             <button class="btn btn-small btn-primary" onclick={undoTakeDown}>
                 <span class="icon" translate="no" aria-hidden="true">undo</span>Undo
             </button>

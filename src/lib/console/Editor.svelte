@@ -1,8 +1,10 @@
 <script>
     // Middle pane of the console: edit one kind of content, then publish it.
-    import { liveshareData, syncStatus, publish, takeDown } from "$lib/liveshare.svelte.js";
-    import { CONTENT, drafts, buildValue, draftError, rowStatus, isDirty } from "./drafts.svelte.js";
+    import { slide } from "svelte/transition";
+    import { liveshareData, syncStatus, takeDown, removeAnnouncement } from "$lib/liveshare.svelte.js";
+    import { CONTENT, drafts, buildValue, draftError, rowStatus, isDirty, publishDraft, editAnnouncement, clearAnnouncementDraft } from "./drafts.svelte.js";
     import { formatClock, relativeToNow } from "$lib/time.js";
+    import { stampOf } from "$lib/announcements.js";
 
     let { key } = $props();
 
@@ -13,10 +15,19 @@
     let busy = $derived(syncStatus.state === "syncing");
 
     const STATUS = { live: "Showing now", edited: "Edited, not published", draft: "Not showing yet", "": "Not showing" };
+    const ANNOUNCEMENT_STATUS = { ...STATUS, edited: "Draft not posted" };
+
+    let posted = $derived(key === "announcements" ? liveshareData.announcements || [] : []);
+    let editing = $derived(key === "announcements" ? drafts.announcements.editing : null);
+    let headline = $state();
 
     async function onPublish() {
-        const value = buildValue(key);
-        if (value) await publish(key, value);
+        await publishDraft(key);
+    }
+
+    function startEdit(item) {
+        editAnnouncement(item);
+        headline?.focus();
     }
 </script>
 
@@ -27,18 +38,23 @@
             <h2 id="editor-heading">{item.label}</h2>
             <p class="hint">{item.hint}</p>
         </div>
-        <span class="state {status}">{STATUS[status]}</span>
+        <span class="state {status}">{(key === "announcements" ? ANNOUNCEMENT_STATUS : STATUS)[status]}</span>
     </header>
 
     <div class="fields">
-        {#if key === "announcement"}
+        {#if key === "announcements"}
+            {#if editing}
+                <p class="edit-note" transition:slide={{ duration: 160 }}>
+                    <span class="icon" translate="no" aria-hidden="true">edit</span>Editing a posted announcement. Attendees see it marked as updated.
+                </p>
+            {/if}
             <label class="field">
                 <span>Headline</span>
-                <input class="input big" bind:value={drafts.announcement.title} placeholder="Lunch is ready" maxlength="120" />
+                <input class="input big" bind:this={headline} bind:value={drafts.announcements.title} placeholder="Lunch is ready" maxlength="120" />
             </label>
             <label class="field">
                 <span>Details <em>optional</em></span>
-                <textarea class="input" rows="4" bind:value={drafts.announcement.message} placeholder="Pizza in the main hall. Vegan options on the left table." maxlength="600"></textarea>
+                <textarea class="input" rows="4" bind:value={drafts.announcements.message} placeholder="Pizza in the main hall. Vegan options on the left table." maxlength="600"></textarea>
             </label>
             <p class="hint">Plain words work best with screen readers. Skip emoji and ASCII art.</p>
 
@@ -53,10 +69,10 @@
                     <input class="input time" type="time" bind:value={drafts.event.at} />
                 </label>
                 <fieldset class="segmented">
-                    <legend class="field-label">Show time as {(drafts.event.hour12) ? "12-hour" : "24-hour"}</legend>
+                    <legend class="field-label">Clock format</legend>
                     <div>
-                        <label><input type="radio" name="hour-format" value={true} bind:group={drafts.event.hour12} /><span>{formatClock(drafts.event.at, true)}</span></label>
-                        <label><input type="radio" name="hour-format" value={false} bind:group={drafts.event.hour12} /><span>{formatClock(drafts.event.at, false)}</span></label>
+                        <label><input type="radio" name="hour-format" value={true} bind:group={drafts.event.hour12} /><span><strong>12-hour</strong><small>{formatClock(drafts.event.at, true) || "3:30 PM"}</small></span></label>
+                        <label><input type="radio" name="hour-format" value={false} bind:group={drafts.event.hour12} /><span><strong>24-hour</strong><small>{formatClock(drafts.event.at, false) || "15:30"}</small></span></label>
                     </div>
                 </fieldset>
             </div>
@@ -88,13 +104,44 @@
     </div>
 
     <footer>
-        {#if live}
+        {#if key === "announcements"}
+            <button class="btn btn-primary" disabled={busy || !buildValue(key)} onclick={onPublish}>{editing ? "Save changes" : "Post announcement"}</button>
+            {#if editing}
+                <button class="btn btn-quiet" onclick={clearAnnouncementDraft}>Cancel edit</button>
+            {:else if live}
+                <button class="btn btn-destructive" disabled={busy} onclick={() => takeDown(key, item.label)}>Take all down</button>
+            {/if}
+        {:else if live}
             <button class="btn btn-primary" disabled={busy || !isDirty(key) || !buildValue(key)} onclick={onPublish}>Update</button>
             <button class="btn btn-destructive" disabled={busy} onclick={() => takeDown(key, item.label)}>Take down</button>
         {:else}
             <button class="btn btn-primary" disabled={busy || !buildValue(key)} onclick={onPublish}>Show to attendees</button>
         {/if}
     </footer>
+
+    {#if key === "announcements" && posted.length}
+        <section class="posted" aria-labelledby="posted-heading">
+            <h3 id="posted-heading">Posted <span class="count">{posted.length}</span></h3>
+            <p class="hint">Newest first. Attendees see all of these; the big screen shows the newest.</p>
+            <ul>
+                {#each posted as a (a.id)}
+                    {@const stamp = stampOf(a)}
+                    <li class:editing={a.id === editing} transition:slide={{ duration: 180 }}>
+                        <div class="post-text">
+                            {#if a.title}<strong>{a.title}</strong>{/if}
+                            {#if a.message}<p>{a.message}</p>{/if}
+                            {#if stamp}<span class="stamp">{stamp.verb} <time datetime={stamp.iso}>{stamp.text}</time></span>{/if}
+                        </div>
+                        <div class="post-actions">
+                            <button class="btn btn-small" disabled={busy || a.id === editing} onclick={() => startEdit(a)}>Edit</button>
+                            <button class="btn btn-small btn-destructive" disabled={busy} onclick={() => removeAnnouncement(a.id)}
+                                aria-label={`Remove “${a.title || a.message}”`}>Remove</button>
+                        </div>
+                    </li>
+                {/each}
+            </ul>
+        </section>
+    {/if}
 </section>
 
 <style>
@@ -138,20 +185,40 @@
 
     .segmented { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; }
     .segmented legend { padding: 0; margin-bottom: 6px; }
-    .segmented > div { display: inline-flex; padding: 3px; border-radius: var(--radius-s); background: var(--surface-sunken); }
+    /* Two clearly separate choices; the picked one fills with the row's color */
+    .segmented > div { display: inline-flex; gap: 6px; }
     .segmented label { position: relative; cursor: pointer; }
     .segmented input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
     .segmented span {
-        display: block;
-        min-height: 38px;
-        padding: 8px 14px;
-        border-radius: 6px;
-        font: 700 0.9rem/1.4 var(--font-mono);
-        color: var(--ink-3);
-        transition: background-color var(--dur-1) var(--ease-out);
+        display: grid;
+        gap: 1px;
+        min-width: 7.5rem;
+        padding: 7px 14px;
+        border: 1.5px solid var(--line-strong);
+        border-radius: var(--radius-s);
+        background: var(--surface);
+        color: var(--ink-2);
+        transition: background-color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
     }
-    .segmented input:checked + span { background: var(--surface-raised); color: var(--ink); }
-    .segmented input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 1px; }
+    .segmented strong { font-size: 0.92rem; }
+    .segmented small { font: 700 0.82rem/1.3 var(--font-mono); color: var(--ink-3); }
+    .segmented label:hover span { border-color: var(--c); }
+    .segmented input:checked + span { border-color: var(--c); background: var(--c); color: var(--on-color); }
+    .segmented input:checked + span small { color: var(--on-color); opacity: 0.85; }
+    .segmented input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+    .edit-note { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: var(--radius-m); background: var(--accent-wash); font-weight: 700; font-size: 0.92rem; }
+
+    .posted { display: grid; gap: 8px; padding-top: 22px; border-top: 1px solid var(--line); }
+    .posted h3 { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; }
+    .posted .count { padding: 1px 9px; border-radius: var(--radius-pill); background: var(--surface-sunken); color: var(--ink-2); font-size: 0.8rem; }
+    .posted ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+    .posted li { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: var(--radius-m); background: var(--surface-raised); }
+    .posted li.editing { box-shadow: inset 0 0 0 2px var(--c); }
+    .post-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+    .post-text p { color: var(--ink-2); font-size: 0.92rem; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+    .stamp { color: var(--ink-3); font-size: 0.82rem; }
+    .post-actions { flex: none; display: flex; gap: 6px; }
 
     footer { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 20px; border-top: 1px solid var(--line); }
 

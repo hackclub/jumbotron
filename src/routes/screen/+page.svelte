@@ -2,7 +2,9 @@
     // The big screen: the tab an organizer drags onto the projector. Shows the announcement and
     // what's up next (when the board is on); during demo time it shows the code to type, then the
     // presenter's screen.
-    // Opened from the console, so it signs in with the organizer credentials saved on this device.
+    // Opened from the console, it signs in with the organizer credentials saved on this device.
+    // A venue computer nobody signs in on is paired instead: the console shows a 6-digit code,
+    // typed here once, and the screen key it unlocks is kept in this browser.
     import { resolve } from "$app/paths";
     import { onMount } from "svelte";
     import { fade } from "svelte/transition";
@@ -10,15 +12,23 @@
     import { internal } from "$lib/liveshare.svelte.js";
     import { API, request } from "$lib/org.svelte.js";
     import { relativeToNow, parseClock, toAt } from "$lib/time.js";
+    import { announcementsOf, stampOf } from "$lib/announcements.js";
 
     const HARPA_URL = import.meta.env.VITE_HARPA_URL || "https://harpa.hackclub.com/?jumbotron=true";
     import Backdrop from "$lib/components/Backdrop.svelte";
     import Wordmark from "$lib/components/Wordmark.svelte";
 
+    const PAIR_KEY = "screenPair";
+
     let status = $state("loading"); // loading | signedout | ready | replaced
+    let paired = $state(false);     // signed in with a pairing code rather than organizer credentials
+    let unpairedNote = $state("");
+    let pairCode = $state("");
+    let pairError = $state("");
+    let pairing = $state(false);
     let connected = $state(false);
     let cityName = $state("");
-    let content = $state({ announcement: null, event: null });
+    let content = $state({ announcement: null, event: null, hour12: undefined });
     let demo = $state({ enabled: false, board: true, screenCode: null, presenter: null });
     let playing = $state(false);   // the presenter's video has frames
     let muted = $state(false);     // the browser refused sound until someone clicks
@@ -39,7 +49,8 @@
     let wakeLock = null;
     let idleTimer = null;
 
-    let joinLink = $derived(`jumbotron.hackclub.com/?code=${internal.code ?? ""}`);
+    let attendeeCode = $state(null);   // the event's code, from the feed (an organizer's own code leads there too)
+    let joinLink = $derived(`jumbotron.hackclub.com/?code=${attendeeCode ?? internal.code ?? ""}`);
     let presenter = $derived(demo.enabled ? demo.presenter : null);
     let board = $derived(demo.board !== false);
     // Harpa plays its own music, which would talk over a live presenter: it's unloaded while
@@ -54,8 +65,14 @@
             try {
                 const payload = JSON.parse(event.data);
                 if (payload.cityName) cityName = payload.cityName;
+                if (payload.code) attendeeCode = payload.code;
                 const data = typeof payload.data === "string" ? JSON.parse(payload.data) : payload.data;
-                content = { announcement: data?.announcement || null, event: data?.event || null };
+                // The big screen shows only the newest announcement; attendees get the rest.
+                content = {
+                    announcement: announcementsOf(data)[0] || null,
+                    event: data?.event || null,
+                    hour12: typeof data?.event?.hour12 === "boolean" ? data.event.hour12 : undefined
+                };
             } catch {
                 // The next message carries the full state again.
             }
@@ -72,7 +89,7 @@
         try {
             const { res, data } = await request("/streamTicket");
             if (res.status === 401) {
-                status = "signedout";
+                signOutScreen();
                 return;
             }
             if (!res.ok || !data.ticket) throw new Error();
@@ -102,9 +119,16 @@
                 control = null;
                 closePeer();
                 status = "replaced";
+            } else if (msg.type === "moved") {
+                // This organizer joined or left an event: reconnect to whichever screen is ours now.
+                es.close();
+                control = null;
+                closePeer();
+                retry = setTimeout(openControl, 500);
             } else if (msg.type === "revoked") {
                 es.close();
-                status = "signedout";
+                control = null;
+                signOutScreen();
             }
         };
         es.onerror = () => {
@@ -315,19 +339,81 @@
         }
     }
 
-    onMount(() => {
-        let creds;
-        try { creds = JSON.parse(localStorage.getItem("creds")); } catch { creds = null; }
-        if (!Array.isArray(creds)) {
-            status = "signedout";
-            return;
-        }
-        [internal.code, internal.slack, internal.name, internal.password] = creds;
-        cityName = localStorage.getItem("cityName") || "";
+    function start() {
         status = "ready";
-
         openFeed();
         openControl();
+    }
+
+    // Credentials stopped working. A paired screen forgets its key and asks for a new code.
+    function signOutScreen() {
+        feed?.close();
+        feed = null;
+        closePeer();
+        if (paired) {
+            try { localStorage.removeItem(PAIR_KEY); } catch {}
+            internal.code = null;
+            internal.screenKey = null;
+            paired = false;
+            unpairedNote = "This screen was signed out from the organizer console. Pair it again to continue.";
+        }
+        status = "signedout";
+    }
+
+    async function pair(event) {
+        event.preventDefault();
+        const typed = pairCode.replace(/\D/g, "");
+        if (typed.length !== 6) {
+            pairError = "Type all 6 digits.";
+            return;
+        }
+        pairing = true;
+        pairError = "";
+        try {
+            const res = await fetch(`${API}/screenPair`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pairCode: typed }),
+                signal: AbortSignal.timeout(15000)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.code || !data.screenKey) {
+                pairError = data.error || "That code didn't work. Try again.";
+                return;
+            }
+            try { localStorage.setItem(PAIR_KEY, JSON.stringify({ code: data.code, screenKey: data.screenKey })); } catch {}
+            internal.code = data.code;
+            internal.screenKey = data.screenKey;
+            internal.password = null;
+            paired = true;
+            unpairedNote = "";
+            pairCode = "";
+            start();
+        } catch {
+            pairError = "Can't reach Jumbotron right now. Check the connection and try again.";
+        } finally {
+            pairing = false;
+        }
+    }
+
+    onMount(() => {
+        let creds, pairedCreds;
+        try { creds = JSON.parse(localStorage.getItem("creds")); } catch { creds = null; }
+        try { pairedCreds = JSON.parse(localStorage.getItem(PAIR_KEY)); } catch { pairedCreds = null; }
+        // The name comes from the server (an organizer's console shows the owner's): no stale local copy.
+        if (Array.isArray(creds)) {
+            [internal.code, internal.slack, internal.name, internal.password] = creds;
+            start();
+        } else if (pairedCreds?.code && pairedCreds?.screenKey) {
+            internal.code = pairedCreds.code;
+            internal.screenKey = pairedCreds.screenKey;
+            internal.password = null;
+            paired = true;
+            start();
+        } else {
+            status = "signedout";
+        }
+
         stayAwake();
         wake();
 
@@ -374,9 +460,26 @@
             <p>Only one tab can be the big screen. Close the other one, then reload this page.</p>
             <button class="btn btn-on-art" onclick={() => location.reload()}>Use this tab</button>
         {:else}
-            <h1>Open this from the organizer console</h1>
-            <p>The big screen uses your organizer sign-in on this device.</p>
-            <a class="btn btn-on-art" href={resolve("/")}>Go to Jumbotron</a>
+            <h1>Pair this screen</h1>
+            {#if unpairedNote}<p class="note" role="status">{unpairedNote}</p>{/if}
+            <p>In the organizer console, open <strong>Big screen</strong>, choose <strong>Pair a computer</strong>, and type the 6-digit code here. Nobody has to sign in on this computer.</p>
+            <form class="pair" onsubmit={pair}>
+                <label class="sr-only" for="pair-code">Pairing code</label>
+                <input
+                    id="pair-code"
+                    class="input mono"
+                    bind:value={pairCode}
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    maxlength="7"
+                    placeholder="000000"
+                    aria-invalid={!!pairError}
+                    aria-describedby={pairError ? "pair-error" : undefined}
+                />
+                <button class="btn btn-on-art" disabled={pairing}>{pairing ? "Pairing" : "Pair screen"}</button>
+            </form>
+            {#if pairError}<p class="pair-error" id="pair-error" role="alert">{pairError}</p>{/if}
+            <p class="alt">Organizer on this computer? <a href={resolve("/")}>Sign in instead</a></p>
         {/if}
     </main>
 {:else if status === "ready"}
@@ -392,8 +495,10 @@
             {/if}
 
             {#if board && content.announcement}
+                {@const stamp = stampOf(content.announcement, content.hour12)}
                 <section class="card" in:fade={{ duration: 200 }}>
-                    <p class="kind"><span class="icon" translate="no" aria-hidden="true">campaign</span>Announcement</p>
+                    <p class="kind"><span class="icon" translate="no" aria-hidden="true">campaign</span>Announcement
+                        {#if stamp}<span class="stamp">· {stamp.verb} <time datetime={stamp.iso}>{stamp.text}</time></span>{/if}</p>
                     {#if content.announcement.title}<h2>{content.announcement.title}</h2>{/if}
                     {#if content.announcement.message}<p class="body">{content.announcement.message}</p>{/if}
                 </section>
@@ -468,6 +573,13 @@
     }
     .message h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(1.8rem, 4vw, 2.8rem); }
     .message .btn { margin-top: 10px; text-decoration: none; }
+    .message p { max-width: 46ch; font-size: clamp(1rem, 1.6vw, 1.3rem); }
+    .message .note { padding: 10px 16px; border-radius: var(--radius-m); background: rgb(20 24 32 / 0.6); font-weight: 700; }
+    .pair { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 8px; }
+    .pair .input { width: 9ch; padding: 12px 14px; font-size: 2rem; font-weight: 700; letter-spacing: 0.18em; text-align: center; }
+    .pair .btn { margin-top: 0; }
+    .pair-error { padding: 8px 14px; border-radius: var(--radius-m); background: var(--danger-wash); color: var(--danger); font-weight: 700; }
+    .alt a { color: var(--on-art); font-weight: 700; }
 
     /* Sized in vw/vh throughout: this page is read from across a room, on any projector. */
     .screen {
@@ -479,19 +591,19 @@
         color: var(--on-art);
     }
     header { display: flex; align-items: center; justify-content: space-between; gap: 2vw; }
-    .join { padding: 0.5em 1em; border-radius: var(--radius-pill); background: rgb(20 24 32 / 0.55); font-size: clamp(1rem, 1.5vw, 1.7rem); }
+    .join { padding: 0.5em 1em; border-radius: var(--radius-pill); background: rgb(20 24 32 / 0.55); font-size: clamp(1.1rem, 2vw, 2.4rem); }
 
     .stage { display: grid; align-content: center; justify-items: center; gap: 3vh; text-align: center; }
     h1 {
         font-family: var(--font-display);
         font-weight: 400;
-        font-size: clamp(3rem, 9vw, 11rem);
+        font-size: clamp(3rem, 8vw, 11rem);
         line-height: 1;
         text-shadow: 0 2px 18px rgb(20 24 32 / 0.45);
         text-wrap: balance;
     }
     .card {
-        width: min(100%, 70vw);
+        width: min(100%, 82vw);
         display: grid;
         gap: 0.6vh;
         padding: 2.4vh 2.4vw;
@@ -501,9 +613,15 @@
         box-shadow: var(--shadow-2);
         text-align: left;
     }
-    .kind { display: flex; align-items: center; gap: 0.4em; color: var(--ink-2); font-size: clamp(0.9rem, 1.3vw, 1.5rem); font-weight: 700; }
-    .card h2 { font-size: clamp(1.6rem, 3.2vw, 4rem); text-wrap: balance; }
-    .body { font-size: clamp(1.1rem, 2vw, 2.4rem); color: var(--ink-2); white-space: pre-line; }
+    /* Read from the back of the room: the headline is the biggest thing after the event name */
+    .kind { display: flex; align-items: center; gap: 0.4em; color: var(--ink-2); font-size: clamp(1.1rem, 2vw, 2.6rem); font-weight: 700; }
+    .stamp { color: var(--ink-3); font-weight: 700; }
+    .card h2 { font-size: clamp(2.2rem, 5vw, 7rem); line-height: 1.05; text-wrap: balance; }
+    .body { font-size: clamp(1.4rem, 3vw, 4rem); line-height: 1.25; color: var(--ink-2); white-space: pre-line; }
+    /* Big type plus a long message would push the screen past the projector's edge; the full
+       text is on attendees' devices. */
+    .card h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+    .card .body { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
     .rel { color: var(--ink-3); }
 
     .airplay {
@@ -515,7 +633,7 @@
         border-radius: var(--radius-l);
         background: rgb(20 24 32 / 0.72);
         backdrop-filter: blur(14px);
-        font-size: clamp(1rem, 1.5vw, 1.8rem);
+        font-size: clamp(1.2rem, 2vw, 2.6rem);
     }
     .airplay > .icon { font-size: 2.6em; }
     .how { display: grid; gap: 0.2em; }

@@ -31,7 +31,7 @@
         transition: background-color var(--dur-2) var(--ease-out);
     }
     .switch.on { background: var(--live); }
-    .switch[disabled] { opacity: 0.5; cursor: progress; }
+    .switch[disabled] { opacity: 0.5; cursor: not-allowed; }
     .switch[hidden=true] { display: none }
     .thumb {
         position: absolute;

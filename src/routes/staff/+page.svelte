@@ -3,8 +3,9 @@
     import { onMount, tick } from "svelte";
     import { fade, slide } from "svelte/transition";
     import { eventName } from "$lib/event";
-    import { internal, liveshareData } from "$lib/liveshare.svelte.js";
-    import { CONTENT, hydrateDrafts } from "$lib/console/drafts.svelte.js";
+    import { internal, liveshareData, LIVE_KEYS } from "$lib/liveshare.svelte.js";
+    import { announcementsOf } from "$lib/announcements.js";
+    import { CONTENT, hydrateDrafts, resetDrafts, applyRemotePacket } from "$lib/console/drafts.svelte.js";
     import { API, org, connectOrgStream, disconnectOrgStream } from "$lib/org.svelte.js";
 
     import Backdrop from "$lib/components/Backdrop.svelte";
@@ -19,15 +20,15 @@
     import Editor from "$lib/console/Editor.svelte";
     import Toasts from "$lib/console/Toasts.svelte";
     import AdminPanel from "$lib/console/AdminPanel.svelte";
-    import Merge from "$lib/configs/merge.svelte";
+    import Organizers from "$lib/console/Organizers.svelte";
 
 
 
     let ready = $state(false);
     let isAdmin = $state(false);
-    let view = $state("event"); // event | admin | merge
+    let view = $state("event"); // event | admin | organizers
     let renaming = $state(false);
-    let selected = $state("announcement");
+    let selected = $state("announcements");
     let editorEl = $state();
     let now = $state(new Date());
 
@@ -40,7 +41,64 @@
         };
     });
 
-    let incomingCount = $derived(org.state?.incoming?.length ?? 0);
+    let inviteCount = $derived(org.state?.invites?.length ?? 0);
+    let bridged = $derived(org.state?.role === "bridged");
+
+    // An organizer of someone else's event shows that event's name, and only its owner can
+    // rename it. Joining or leaving switches which event this console publishes to, so its
+    // content is reloaded from the server: publishing stale content would wipe the other
+    // event's. Leaving goes back to this organizer's own event, or to naming it if it never had
+    // a name (joined by invite on first sign-in).
+    let lastRoot = null;
+    $effect(() => {
+        const state = org.state;
+        if (!state) return;
+        const root = state.root.code;
+        if (state.role === "bridged") {
+            renaming = false;
+            internal.cityName = state.root.cityName || "";
+            internal.initComplete = true;
+        }
+        if (lastRoot !== null && lastRoot !== root) loadPacket({ leaving: state.role !== "bridged", switching: true });
+        lastRoot = root;
+    });
+
+    // Pulls what attendees see right now (the owner's event, for an organizer) into the console.
+    // `switching`: a different event's content, so drafts typed for the old one are dropped.
+    async function loadPacket({ leaving = false, switching = false } = {}) {
+        let data;
+        try {
+            const response = await fetch(`${API}/getPacket?code=${encodeURIComponent(internal.code)}`);
+            if (!response.ok) return false;
+            data = await response.json();
+        } catch {
+            return false;
+        }
+        if (data.cityName?.trim()) {
+            internal.cityName = data.cityName;
+            internal.initComplete = true;
+            localStorage.setItem("cityName", data.cityName);
+        } else if (leaving) {
+            internal.cityName = "";
+            internal.initComplete = false;
+            localStorage.removeItem("cityName");
+            if (view === "organizers") view = "event";   // the tab hides until it's named
+        }
+        let synced = null;
+        try { synced = typeof data.data === "string" ? JSON.parse(data.data) : data.data; } catch {}
+        if (switching) resetDrafts();
+        for (const key of LIVE_KEYS) {
+            liveshareData[key] = (synced && synced[key]) || null;
+        }
+        // Packets from before announcements were a list carry just one.
+        const announcements = announcementsOf(synced);
+        liveshareData.announcements = announcements.length ? announcements : null;
+        if (synced) {
+            hydrateDrafts();
+            internal.importedSync = true;
+        }
+        return true;
+    }
 
     async function init() {
         let creds;
@@ -59,39 +117,19 @@
             try { internal.sources = JSON.parse(creds[4]); } catch { internal.sources = []; }
         }
 
-        // Live merge state (requests, merges, removals, admin resets) for this organizer
-        connectOrgStream({ onSignOut: signOut });
+        // Live organizer state (invites, joins, removals, admin resets) for this console
+        connectOrgStream({ onSignOut: signOut, onPacket: applyRemotePacket, onReconnect: refreshContent });
 
         // Always pull the live packet so the console reflects what attendees see right now.
-        try {
-            const response = await fetch(`${API}/getPacket?code=${encodeURIComponent(internal.code)}`);
-            if (response.ok) {
-                const data = await response.json();
-                if (data.cityName?.trim()) {
-                    internal.cityName = data.cityName;
-                    internal.initComplete = true;
-                    localStorage.setItem("cityName", data.cityName);
-                }
-                let synced = null;
-                try { synced = typeof data.data === "string" ? JSON.parse(data.data) : data.data; } catch {}
-                if (synced) {
-                    for (const key of ["announcement", "event", "file", "youtube", "website"]) {
-                        liveshareData[key] = synced[key] || null;
-                    }
-                    hydrateDrafts();
-                    internal.importedSync = true;
-                }
-            }
-        } catch {
-            // Offline: fall back to the name saved on this device.
-        }
+        // Offline: fall back to the name saved on this device (below).
+        await loadPacket();
         if (!internal.initComplete && localStorage.getItem("cityName")) {
             internal.cityName = localStorage.getItem("cityName");
             internal.initComplete = true;
         }
 
         // Open on whatever is already showing, so the first screen is the one most likely to change.
-        selected = CONTENT.find((c) => liveshareData[c.key])?.key ?? "announcement";
+        selected = CONTENT.find((c) => liveshareData[c.key])?.key ?? "announcements";
         ready = true;
 
         try {
@@ -108,13 +146,24 @@
         }
     }
 
-    async function select(key) {
+    // After the stream drops, catch up on anything other organizers published meanwhile.
+    async function refreshContent() {
+        try {
+            const response = await fetch(`${API}/getPacket?code=${encodeURIComponent(internal.code)}`);
+            if (response.ok) applyRemotePacket((await response.json()).data);
+        } catch {
+            // The next reconnect tries again.
+        }
+    }
+
+    async function select(key, { focus = false } = {}) {
         selected = key;
+        await tick();
         // On a single-column layout the editor sits below the list; bring it into view.
         if (window.matchMedia("(max-width: 760px)").matches) {
-            await tick();
             editorEl?.scrollIntoView({ behavior: "smooth", block: "start" });
         }
+        if (focus) editorEl?.querySelector("input, textarea")?.focus({ preventScroll: true });
     }
 
     function signOut() {
@@ -142,8 +191,8 @@
             <div class="view-switch" role="group" aria-label="Console view">
                 <button aria-pressed={view === "event"} onclick={() => (view = "event")}>Event</button>
                 {#if internal.initComplete}
-                    <button aria-pressed={view === "merge"} onclick={() => (view = "merge")}>
-                        Merge{#if incomingCount}<span class="count-badge" aria-label="{incomingCount} pending requests">{incomingCount}</span>{/if}
+                    <button aria-pressed={view === "organizers"} onclick={() => (view = "organizers")}>
+                        Organizers{#if inviteCount}<span class="count-badge" aria-label="{inviteCount} invites waiting">{inviteCount}</span>{/if}
                     </button>
                 {/if}
                 {#if isAdmin}
@@ -172,7 +221,7 @@
             {/if}
             {#if org.state?.role === "bridged" && view === "event"}
                 <p class="notice" transition:slide={{ duration: 200 }}>
-                    Merged into <strong>{org.state.root.name}</strong>'s event (code <span class="mono">{org.state.root.code}</span>). What you publish goes to everyone in the merge.
+                    You're an organizer of <strong>{org.state.root.name}</strong>'s event. Everything here is shared with them.
                 </p>
             {/if}
         </div>
@@ -184,9 +233,9 @@
         <main class="single" in:fade={{ duration: 150 }}>
             <div class="panel"><AdminPanel /></div>
         </main>
-    {:else if view === "merge"}
+    {:else if view === "organizers"}
         <main class="single" in:fade={{ duration: 150 }}>
-            <div class="panel"><Merge /></div>
+            <div class="panel"><Organizers /></div>
         </main>
     {:else}
         <section class="hero" in:fade={{ duration: 150 }}>
@@ -195,16 +244,18 @@
                 <h1>{eventName}{internal.initComplete ? ` ${internal.cityName}` : ""}</h1>
                     <div class="meta">
                         <SyncPill />
-                        <button class="btn btn-small btn-on-art" onclick={() => (renaming = !renaming)} aria-expanded={renaming}>
-                            {renaming ? "Cancel rename" : "Rename event"}
-                        </button>
+                        {#if !bridged}
+                            <button class="btn btn-small btn-on-art" onclick={() => (renaming = !renaming)} aria-expanded={renaming}>
+                                {renaming ? "Cancel rename" : "Rename event"}
+                            </button>
+                        {/if}
                     </div>
                 {/if}
             </div>
             {#if internal.initComplete}<ShareCard />{/if}
         </section>
 
-        {#if !internal.initComplete || renaming}
+        {#if (!internal.initComplete && !bridged) || (renaming && !bridged)}
             <div class="panel narrow" transition:slide={{ duration: 220 }}>
                 {#if renaming}
                     <SetupCard oncancel={() => (renaming = false)} ondone={() => (renaming = false)} />

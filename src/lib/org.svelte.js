@@ -1,9 +1,10 @@
 import { internal } from "$lib/liveshare.svelte";
 
-import { API } from "$lib/api.js";
+import { API, TAB_ID } from "$lib/api.js";
 export { API };
 
-// `state` mirrors the server's mergeState(): { code, role, root, members, incoming, outgoing }
+// `state` mirrors the server's mergeState(), the organizers of this event:
+// { code, role: "root" (owner) | "bridged" (organizer of `root`), root, members, invitesSent, invites }
 export const org = $state({
     connected: false,
     state: null,
@@ -20,6 +21,7 @@ export const demo = $state({
     board: true,
     screenCode: null,
     screenOpen: false,
+    paired: false,   // a venue computer has been paired (or a pairing code made) for this event
     presenter: null,
     mirror: false,   // the presenter's screen also goes to attendees' devices (as snapshots)
     queue: []        // [{ id, name, slack, connected }] waiting for an organizer to approve them
@@ -53,46 +55,52 @@ const nameOf = (e) => (e && e.name) || "Another organizer";
 const newIn = (now, before) => (now || []).find(x => !(before || []).some(y => y.code === x.code));
 const goneFrom = (now, before) => (before || []).find(x => !(now || []).some(y => y.code === x.code));
 
-// Turns a pushed merge event into a sentence for this organizer, or "" when the change was
-// caused by this organizer's own click (the panel already reflects it).
+const inviteeName = (i) => (i && (i.name || i.slack)) || "Someone";
+const goneInvite = (now, before) => (before || []).find(x => !(now || []).some(y => y.slack === x.slack));
+
+// Turns a pushed organizers event into a sentence for this organizer, or "" when the change
+// was caused by this organizer's own click (the panel already reflects it).
 export function describeMergeEvent(reason, state, prev) {
     const wasBridged = prev && prev.role === "bridged";
     switch (reason) {
-        case "request_received":
-            return `${nameOf(newIn(state.incoming, prev && prev.incoming))} wants to merge into your event.`;
-        case "request_rejected":
-            return prev && prev.outgoing && !state.outgoing ? `${nameOf(prev.outgoing)} declined your merge request.` : "";
-        case "request_cancelled": {
-            // Judge by what vanished from *incoming*: the canceller's own echo changes only its outgoing.
-            const gone = goneFrom(state.incoming, prev && prev.incoming);
-            return gone ? `${nameOf(gone)} withdrew their merge request.` : "";
-        }
-        case "target_merged_elsewhere":
-            return prev && prev.outgoing && !state.outgoing
-                ? `${nameOf(prev.outgoing)}'s event merged into another event, so your request was cancelled.`
-                : "";
-        case "outgoing_cancelled":
-            return "Your outgoing merge request was cancelled because you accepted another event.";
         case "merged":
             if (state.role === "bridged" && !wasBridged) {
-                return `You're now merged into ${nameOf(state.root)}'s event. Your participants see the shared screen.`;
+                return `You're now an organizer of ${nameOf(state.root)}'s event. Everything here is shared with them.`;
             }
-            return state.role === "root" ? `${nameOf(newIn(state.members, prev && prev.members))} merged into your event.` : "";
-        case "member_left":
-            return wasBridged ? "" : `${nameOf(goneFrom(state.members, prev && prev.members))} left your merged event.`;
+            return `${nameOf(newIn(state.members, prev && prev.members))} joined as an organizer.`;
+        case "member_left": {
+            const gone = goneFrom(state.members, prev && prev.members);
+            return gone ? `${nameOf(gone)} is no longer an organizer.` : "";
+        }
         case "member_removed":
-            return wasBridged && state.role === "root" ? `${nameOf(prev.root)} removed your event from their merge.` : "";
+            if (wasBridged && state.role === "root") return `${nameOf(prev.root)} removed you as an organizer. You're back on your own event.`;
+            return wasBridged ? "" : `${nameOf(goneFrom(state.members, prev && prev.members))} was removed as an organizer.`;
         case "host_removed":
-            return "The event you were merged into was removed by an administrator. Your event is standalone again.";
-        case "target_unavailable":
-            return "A merge request was removed because the other event is no longer available.";
+            return "The event you helped organize was removed by an administrator. You're back on your own event.";
+        case "invite_sent": {
+            const added = (state.invitesSent || []).find(x => !((prev && prev.invitesSent) || []).some(y => y.slack === x.slack));
+            return added ? `${inviteeName(added)} was invited by another organizer.` : "";
+        }
+        case "invite_received":
+            return `${nameOf(newIn(state.invites, prev && prev.invites))} invited you to organize their event.`;
+        case "invite_cancelled": {
+            const gone = goneFrom(state.invites, prev && prev.invites);
+            return gone ? `${nameOf(gone)} withdrew their invite.` : "";
+        }
+        case "invite_declined": {
+            const gone = goneInvite(state.invitesSent, prev && prev.invitesSent);
+            return gone ? `${inviteeName(gone)} declined the invite.` : "";
+        }
+        case "invite_unavailable":
+            return "An invite was removed because it can no longer be accepted.";
         default:
             return "";
     }
 }
 
 let noticeTimer = null;
-function showNotice(text) {
+// Also used by panels for outcomes the user should still see after the panel itself goes away.
+export function showNotice(text) {
     if (!text) return;
     org.notice = text;
     clearTimeout(noticeTimer);
@@ -109,7 +117,10 @@ let stream = null;
 let retryTimer = null;
 let openTimer = null;
 let resyncTimer = null;
-let handlers = { onSignOut: () => {}, onEvent: () => {} };
+// onPacket: content another organizer (or another tab) published. onReconnect: the stream came
+// back after a drop, so pushes may have been missed.
+let handlers = { onSignOut: () => {}, onEvent: () => {}, onPacket: () => {}, onReconnect: () => {} };
+let everOpened = false;          // per session: the first open isn't a reconnect
 
 let attempt = 0;                 // bumped per stream (re)connect so stale async attempts bail out
 let session = 0;                 // bumped on connect/disconnect only: outlives stream reconnects
@@ -122,7 +133,8 @@ export async function request(path, body = {}) {
         res = await fetch(`${API}${path}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code: internal.code, password: internal.password, ...body }),
+            // A paired big screen has a screen key instead of a password.
+            body: JSON.stringify({ code: internal.code, password: internal.password, screenKey: internal.screenKey ?? undefined, ...body }),
             signal: AbortSignal.timeout(REQUEST_TIMEOUT)
         });
     } catch (e) {
@@ -207,6 +219,8 @@ async function openStream() {
         if (es !== stream) return;
         clearTimeout(openTimer);
         org.connected = true;
+        if (everOpened) handlers.onReconnect();
+        everOpened = true;
     };
 
     es.onmessage = (event) => {
@@ -224,6 +238,9 @@ async function openStream() {
             applyDemo(msg.demo);
         } else if (msg.type === "harpa") {
             applyHarpa(msg.harpa);
+        } else if (msg.type === "packet") {
+            // Our own publish is already applied (from its POST answer).
+            if (msg.tab !== TAB_ID) handlers.onPacket(msg.data);
         } else if (msg.type === "revoked") {
             signOutNow();
         } else if (msg.type === "reset") {
@@ -263,6 +280,7 @@ export function connectOrgStream(options = {}) {
     handlers = { ...handlers, ...options };
     if (!internal.code || !internal.password) return;
     session++;
+    everOpened = false;
     openStream();
     resync();
     clearInterval(resyncTimer);
@@ -288,11 +306,15 @@ async function post(path, body = {}) {
     return data;
 }
 
-export const sendMergeRequest = (destination) => post("/mergeRequest", { destination });
-export const cancelMergeRequest = () => post("/cancelMergeRequest");
-export const respondMergeRequest = (requester, accept) => post("/respondMergeRequest", { requester, accept });
 export const removeMember = (target) => post("/unmerge", { target });
 export const leaveMerge = () => post("/unmerge");
+export const sendInvite = (slack) => post("/mergeInvite", { slack });
+export const cancelInvite = (slack) => post("/cancelMergeInvite", { slack });
+export const respondInvite = (host, accept) => post("/respondMergeInvite", { host, accept });
+
+// Big screen pairing for venue computers that shouldn't hold an organizer sign-in.
+export const createPairCode = () => post("/screenPairCode");
+export const unpairScreens = () => post("/screenUnpair");
 
 async function demoPost(path, body) {
     const data = await post(path, body);

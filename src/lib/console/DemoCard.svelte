@@ -2,7 +2,8 @@
     // Big screen controls: open the projector tab, choose whether it shows announcements, and
     // turn on demo time so attendees can share their screen to it.
     import { resolve } from "$app/paths";
-    import { demo, setDemos, setBoard, setMirror, stopPresenter, approveQueued, removeQueued } from "$lib/org.svelte.js";
+    import { slide } from "svelte/transition";
+    import { demo, setDemos, setBoard, setMirror, stopPresenter, approveQueued, removeQueued, createPairCode, unpairScreens } from "$lib/org.svelte.js";
     import Switch from "$lib/components/Switch.svelte";
 
     let busy = $state(false);
@@ -11,6 +12,40 @@
     const avatar = (slack) => `https://cachet.hackclub.com/users/${slack}/r`;
     // Approving someone while another presenter is on takes the screen from them.
     let screenBusy = $derived(!!demo.presenter);
+
+    // Pairing a venue computer: a 6-digit code it types at /screen, good for 10 minutes.
+    let pairing = $state(null);   // { pairCode, expires } while a code is showing
+    let pairNow = $state(Date.now());
+    let pairNote = $state("");
+    let pairLeft = $derived(pairing ? Math.max(0, Math.ceil((pairing.expires - pairNow) / 1000)) : 0);
+
+    $effect(() => {
+        if (!pairing) return;
+        const timer = setInterval(() => {
+            pairNow = Date.now();
+            if (pairNow >= pairing.expires) pairing = null;
+        }, 1000);
+        return () => clearInterval(timer);
+    });
+
+    const minutes = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+    function newPairCode() {
+        pairNote = "";
+        run(async () => {
+            const data = await createPairCode();
+            pairNow = Date.now();
+            pairing = { pairCode: data.pairCode, expires: data.expires };
+        });
+    }
+
+    function unpair() {
+        run(async () => {
+            await unpairScreens();
+            pairing = null;
+            pairNote = "Paired computers are signed out. Pair again to use one.";
+        });
+    }
 
     async function run(action) {
         if (busy) return;
@@ -33,6 +68,29 @@
             <span class="icon" translate="no" aria-hidden="true">tv</span>{demo.screenOpen ? "Open again" : "Open"}
         </a>
     </div>
+    <div class="pairing">
+        {#if pairing}
+            <div class="pair-code" transition:slide={{ duration: 180 }}>
+                <span class="pair-label">On the venue computer, open <span class="mono">jumbotron.hackclub.com/screen</span> and type</span>
+                <strong class="mono" translate="no">{pairing.pairCode.slice(0, 3)} {pairing.pairCode.slice(3)}</strong>
+                <span class="pair-label">Works once · expires in {minutes(pairLeft)}</span>
+                <span class="pair-actions">
+                    <button class="btn btn-small btn-quiet" onclick={() => (pairing = null)}>Done</button>
+                    <button class="btn btn-small btn-quiet" disabled={busy} onclick={unpair}>Sign out paired computers</button>
+                </span>
+            </div>
+        {:else}
+            <button class="btn btn-small btn-quiet pair-open" disabled={busy} onclick={newPairCode}>
+                <span class="icon" translate="no" aria-hidden="true">link</span>Pair a computer
+            </button>
+            <span class="pair-hint">For venue computers you don't want to sign in on</span>
+            {#if demo.paired}
+                <button class="btn btn-small btn-quiet" disabled={busy} onclick={unpair}>Sign out paired computers</button>
+            {/if}
+        {/if}
+        {#if pairNote}<p class="hint" role="status">{pairNote}</p>{/if}
+    </div>
+
     <!-- <p class="hint">
         {demo.screenOpen
             ? "Connected. Keep that tab full screen on the projector."
@@ -43,7 +101,7 @@
         <li>
             <span class="text">
                 <span class="label">Show announcements</span>
-                <span class="sub">Announcement and up next, on the projector</span>
+                <span class="sub">Newest announcement and up next, on the projector</span>
             </span>
             <Switch checked={demo.board} label="Show announcements on the big screen" disabled={busy} onchange={(on) => run(() => setBoard(on))} />
         </li>
@@ -134,4 +192,12 @@
     .queue { display: grid; gap: 6px; }
     .queue ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
     .queue li { justify-content: flex-start; gap: 10px; padding: 6px 0; }
+
+    .pairing { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+    .pair-open { padding-left: 8px; }
+    .pair-hint { color: var(--ink-3); font-size: 0.82rem; }
+    .pair-code { flex: 1; display: grid; gap: 4px; padding: 12px 14px; border-radius: var(--radius-m); background: var(--surface-raised); }
+    .pair-code strong { font-size: 2rem; letter-spacing: 0.12em; line-height: 1.1; }
+    .pair-label { color: var(--ink-3); font-size: 0.84rem; }
+    .pair-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-left: -10px; }
 </style>

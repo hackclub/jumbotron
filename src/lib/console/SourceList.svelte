@@ -1,8 +1,8 @@
 <script>
     // Left pane of the console: every kind of content, whether it's on attendee screens,
     // and a switch to show or hide it. Selecting a row opens it in the editor.
-    import { liveshareData, syncStatus, publish, takeDown } from "$lib/liveshare.svelte.js";
-    import { CONTENT, buildValue, rowStatus, liveSummary } from "./drafts.svelte.js";
+    import { liveshareData, syncStatus, takeDown } from "$lib/liveshare.svelte.js";
+    import { CONTENT, buildValue, rowStatus, liveSummary, publishDraft } from "./drafts.svelte.js";
     import Switch from "$lib/components/Switch.svelte";
 
     let { selected, onselect } = $props();
@@ -13,17 +13,18 @@
     function statusText(key) {
         switch (rowStatus(key)) {
             case "live": return liveSummary(key);
-            case "edited": return "Edited, not published yet";
+            case "edited": return key === "announcements" ? "Draft not posted yet" : "Edited, not published yet";
             case "draft": return "Ready to show";
-            default: return "Not showing";
+            default: return "Nothing added yet";
         }
     }
 
+    // Turning on a row with nothing filled in opens its editor instead, with the cursor in the
+    // first field, so the switch never looks stuck.
     function toggle(item, on) {
         if (!on) return takeDown(item.key, item.label);
-        const value = buildValue(item.key);
-        if (value) publish(item.key, value);
-        else onselect(item.key);
+        if (buildValue(item.key)) publishDraft(item.key);
+        else onselect(item.key, { focus: true });
     }
 </script>
 
@@ -48,7 +49,7 @@
                 <Switch
                     checked={live}
                     label="Show {item.label} to attendees"
-                    disabled={busy || (!live && !buildValue(item.key))}
+                    disabled={busy}
                     hidden={(!live && !buildValue(item.key))}
                     onchange={(on) => toggle(item, on)}
                 />
@@ -110,5 +111,4 @@
     li.live .sub { color: var(--ink-2); }
     .sub.edited { color: var(--orange-ink); }
 
-    .hint { padding: 4px 6px 0; }
 </style>

@@ -8,10 +8,10 @@
     import AttendeeFeed from "$lib/components/AttendeeFeed.svelte";
     import ShareScreen from "$lib/components/ShareScreen.svelte";
     import DemoMirror from "$lib/components/DemoMirror.svelte";
-    import { labelFor } from "$lib/console/drafts.svelte.js";
     import { API } from "$lib/org.svelte.js";
+    import { announcementsOf } from "$lib/announcements.js";
 
-    const KEYS = ["announcement", "event", "file", "youtube", "website"];
+    const KEYS = ["announcements", "event", "file", "youtube", "website"];
 
     let missing = $state(false);
     let cityName = $state("");
@@ -21,13 +21,13 @@
     let presenting = $state(false); // this device is the one sharing: don't mirror it back
     let connection = $state("connecting"); // connecting | live | reconnecting | offline
     let changed = $state([]);
-    let announcement = $state(""); // screen-reader summary of what changed
     let now = $state(new Date());
 
-    let liveshareData = $state({ announcement: null, event: null, file: null, youtube: null, website: null });
+    let liveshareData = $state({ announcements: null, event: null, file: null, youtube: null, website: null });
 
     let source = null;
     let changedTimer = null;
+    let seen = false;   // the first state this page gets is just what's there, not "new"
 
     function parsePacket(rawPacket, { quiet = false } = {}) {
         if (!rawPacket) return;
@@ -40,17 +40,24 @@
         if (!parsed) return;
 
         const updated = [];
+        // Packets from before announcements were a list carry a single `announcement`.
+        const list = announcementsOf(parsed);
+        parsed = { ...parsed, announcements: list.length ? list : null };
+
+        const newest = (l) => JSON.stringify(l?.[0] ?? null);
         for (const key of KEYS) {
             const next = parsed[key] || null;
             if (JSON.stringify(next) !== JSON.stringify(liveshareData[key])) {
-                if (next) updated.push(key);
+                // Removing an older announcement isn't news; a new or edited newest one is.
+                const fresh = key !== "announcements" || newest(next) !== newest(liveshareData[key]);
+                if (next && fresh) updated.push(key);
                 liveshareData[key] = next;
             }
         }
 
         if (!quiet && updated.length) {
+            // Screen readers hear the changed items themselves: the feed is a live region.
             changed = updated;
-            announcement = `${updated.map(labelFor).join(", ")} updated`;
             clearTimeout(changedTimer);
             changedTimer = setTimeout(() => (changed = []), 6000);
         }
@@ -72,7 +79,8 @@
                 if (payload.cityName) cityName = payload.cityName;
                 demos = !!payload.demos;
                 mirror = payload.mirror ?? null;
-                parsePacket(payload.data);
+                parsePacket(payload.data, { quiet: !seen });
+                seen = true;
             } catch {
                 // Ignore malformed messages; the next one will carry the full state.
             }
@@ -91,6 +99,7 @@
             cityName = saved?.cityName || "";
             demos = !!saved?.demos;
             parsePacket(saved?.data, { quiet: true });
+            seen = !!saved;
         } catch {
             // No cached packet; the stream will fill everything in.
         }
@@ -160,8 +169,6 @@
                 </div>
             {/if}
 
-            <p class="sr-only" aria-live="polite">{announcement}</p>
-
             {#if demos}
                 <ShareScreen {code} bind:presenting />
             {/if}
@@ -172,6 +179,7 @@
                 data={liveshareData}
                 {changed}
                 {now}
+                live
                 emptyText={cityName ? "" : "Your organizers haven't started this event yet. This page updates on its own."}
             />
         {/if}

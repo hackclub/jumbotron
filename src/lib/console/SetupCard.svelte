@@ -2,6 +2,8 @@
     import { eventName } from "$lib/event";
     import { internal } from "$lib/liveshare.svelte.js";
     import { API } from "$lib/api.js";
+    import { org } from "$lib/org.svelte.js";
+    import InvitesReceived from "./InvitesReceived.svelte";
 
     // `oncancel` is only passed when renaming an event that's already set up.
     let { oncancel, ondone } = $props();
@@ -41,6 +43,13 @@
     }
 </script>
 
+{#if !oncancel && org.state?.invites?.length}
+    <div class="invited">
+        <InvitesReceived heading="You've been added as an organizer" />
+        <p class="or">Or start your own event</p>
+    </div>
+{/if}
+
 <form class="setup" onsubmit={save}>
     <div>
         <h2>{oncancel ? "Rename your event" : "Name your event"}</h2>
@@ -72,4 +81,7 @@
     .hint { margin-top: 4px; }
     .preview { color: var(--ink-2); }
     .actions { display: flex; gap: 8px; }
+    .invited { display: grid; gap: 16px; max-width: 460px; margin-bottom: 20px; }
+    .or { display: flex; align-items: center; gap: 12px; color: var(--ink-3); font-size: 0.88rem; font-weight: 700; }
+    .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 </style>

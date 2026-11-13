@@ -5,8 +5,15 @@
     import { eventTheme } from "$lib/event.js";
     import { relativeToNow, parseClock, toAt } from "$lib/time.js";
     import { safeHref } from "$lib/links.js";
+    import { announcementsOf, stampOf } from "$lib/announcements.js";
 
-    let { data, changed = [], now = new Date(), compact = false, emptyText = "" } = $props();
+    // `live` makes screen readers read new and edited items out as they arrive (attendee page
+    // only; the console preview would talk over the organizer's own edits).
+    let { data, changed = [], now = new Date(), compact = false, emptyText = "", live = false } = $props();
+
+    let announcements = $derived(announcementsOf(data));
+    // Announcement times follow the clock format the organizers picked for Up next.
+    let hour12 = $derived(typeof data.event?.hour12 === "boolean" ? data.event.hour12 : undefined);
 
     // Links from the packet are untrusted: anything that isn't plain http(s) is dropped.
     let fileHref = $derived(data.file ? safeHref(data.file) : null);
@@ -26,10 +33,10 @@
         ].filter(Boolean)
     );
 
-    let isEmpty = $derived(!data.announcement && !data.event && links.length === 0);
+    let isEmpty = $derived(announcements.length === 0 && !data.event && links.length === 0);
 </script>
 
-<div class="feed" class:compact>
+<div class="feed" class:compact aria-live={live ? "polite" : undefined}>
     {#if isEmpty}
         <div class="empty">
             <img src={resolve(eventTheme.mascot)} alt="" />
@@ -38,18 +45,25 @@
         </div>
     {/if}
 
-    {#if data.announcement}
-        <section class="block" style:--c="var(--c-announcement)" class:changed={changed.includes("announcement")} aria-label="Announcement">
-            <p class="kind"><span class="icon" translate="no" aria-hidden="true">campaign</span>Announcement
-                {#if changed.includes("announcement")}<span class="new">New</span>{/if}</p>
-            {#if data.announcement.title}<h2>{data.announcement.title}</h2>{/if}
-            {#if data.announcement.message}<p class="body">{data.announcement.message}</p>{/if}
-        </section>
+    {#if announcements.length}
+        <ul class="announcements" aria-label="Announcements">
+            {#each announcements as a, i (a.id)}
+                {@const stamp = stampOf(a, hour12)}
+                {@const fresh = i === 0 && changed.includes("announcements")}
+                <li class="block" class:earlier={i > 0} style:--c="var(--c-announcement)" class:changed={fresh} aria-atomic="true">
+                    <p class="kind"><span class="icon" translate="no" aria-hidden="true">campaign</span>{i === 0 ? "Announcement" : "Earlier"}
+                        {#if fresh}<span class="new">{a.updatedAt ? "Updated" : "New"}</span>{/if}</p>
+                    {#if a.title}<h2>{a.title}</h2>{/if}
+                    {#if a.message}<p class="body">{a.message}</p>{/if}
+                    {#if stamp}<p class="stamp">{stamp.verb} at <time datetime={stamp.iso}>{stamp.text}</time></p>{/if}
+                </li>
+            {/each}
+        </ul>
     {/if}
 
     {#if data.event}
         {@const rel = relativeToNow(eventAt(data.event), now)}
-        <section class="block" style:--c="var(--c-event)" class:changed={changed.includes("event")} aria-label="Up next">
+        <section class="block" style:--c="var(--c-event)" class:changed={changed.includes("event")} aria-label="Up next" aria-atomic="true">
             <p class="kind"><span class="icon" translate="no" aria-hidden="true">schedule</span>Up next
                 {#if changed.includes("event")}<span class="new">New</span>{/if}</p>
             <h2>{data.event.title}</h2>
@@ -110,6 +124,14 @@
         text-wrap: balance;
     }
     .body { margin-top: 8px; font-size: 1.08rem; max-width: 60ch; white-space: pre-line; }
+    .stamp { margin-top: 10px; font-size: 0.86rem; font-weight: 700; opacity: 0.85; }
+
+    .announcements { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    /* Older announcements stay readable but step back behind the newest */
+    .earlier { padding: 14px 18px 16px; }
+    .earlier h2 { font-size: 1.2rem; }
+    .earlier .body { font-size: 0.98rem; margin-top: 4px; }
+    .earlier .kind { opacity: 0.85; margin-bottom: 4px; }
 
     .when { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     .time { font: 700 1.5rem/1 var(--font-mono); letter-spacing: -0.02em; }
@@ -174,6 +196,8 @@
     .compact .kind { font-size: 0.78rem; margin-bottom: 4px; }
     .compact h2 { font-size: 1.2rem; }
     .compact .body { font-size: 0.92rem; margin-top: 4px; }
+    .compact .stamp { font-size: 0.75rem; margin-top: 6px; }
+    .compact .earlier h2 { font-size: 1rem; }
     .compact .time { font-size: 1.1rem; }
     .compact .rel { font-size: 0.78rem; padding: 2px 8px; }
     .compact .when { margin-top: 8px; }

@@ -2,11 +2,14 @@
     import { resolve } from "$app/paths";
     import { eventName } from "$lib/event";
     import { internal } from "$lib/liveshare.svelte.js";
+    import { org } from "$lib/org.svelte.js";
 
+    // Organizers of someone else's event share that event's code.
+    let code = $derived(org.state?.root?.code ?? internal.code);
     let copied = $state(false);
     let copyTimer = null;
 
-    let link = $derived(`jumbotron.hackclub.com/?code=${internal.code ?? ""}`);
+    let link = $derived(`jumbotron.hackclub.com/?code=${code ?? ""}`);
 
     async function copy() {
         try {
@@ -23,14 +26,14 @@
 <section class="ticket" aria-label="Attendee code">
     <div class="code-side">
         <span class="label">Attendees join with</span>
-        <span class="code mono" translate="no">{internal.code ?? "····"}</span>
+        <span class="code mono" translate="no">{code ?? "····"}</span>
     </div>
     <div class="link-side">
-        <button class="copy" class:done={copied} onclick={copy} disabled={!internal.code} title="Yours for all of {eventName}. Renaming your event keeps it.">
+        <button class="copy" class:done={copied} onclick={copy} disabled={!code} title="Yours for all of {eventName}. Renaming your event keeps it.">
             <span class="url mono" translate="no">{link}</span>
             <span class="copy-label"><span class="icon" translate="no" aria-hidden="true">{copied ? "check" : "content_copy"}</span>{copied ? "Copied" : "Copy link"}</span>
         </button>
-        <a class="open" href={resolve("/") + `?code=${internal.code ?? ""}`} target="_blank" rel="noopener">
+        <a class="open" href={resolve("/") + `?code=${code ?? ""}`} target="_blank" rel="noopener">
             <span class="icon" translate="no" aria-hidden="true">cast</span>Open attendee view
         </a>
     </div>
