@@ -77,6 +77,8 @@ export function describeMergeEvent(reason, state, prev) {
             return wasBridged ? "" : `${nameOf(goneFrom(state.members, prev && prev.members))} was removed as an organizer.`;
         case "host_removed":
             return "The event you helped organize was removed by an administrator. You're back on your own event.";
+        case "host_deleted":
+            return "The owner deleted the event you helped organize. You're back on your own event.";
         case "invite_sent": {
             const added = (state.invitesSent || []).find(x => !((prev && prev.invitesSent) || []).some(y => y.slack === x.slack));
             return added ? `${inviteeName(added)} was invited by another organizer.` : "";
@@ -311,6 +313,8 @@ export const leaveMerge = () => post("/unmerge");
 export const sendInvite = (slack) => post("/mergeInvite", { slack });
 export const cancelInvite = (slack) => post("/cancelMergeInvite", { slack });
 export const respondInvite = (host, accept) => post("/respondMergeInvite", { host, accept });
+// Deletes this organizer's event for good; the caller signs out afterwards.
+export const deleteEvent = () => post("/deleteEvent");
 
 // Big screen pairing for venue computers that shouldn't hold an organizer sign-in.
 export const createPairCode = () => post("/screenPairCode");

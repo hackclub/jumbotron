@@ -4,8 +4,9 @@
     // big screen, one demo queue and the same content. (Underneath, each organizer's own event
     // points at the owner's: see mergeState() in the backend.)
     import { slide } from "svelte/transition";
+    import { resolve } from "$app/paths";
     import { internal } from "$lib/liveshare.svelte";
-    import { org, sendInvite, cancelInvite, removeMember, leaveMerge, showNotice } from "$lib/org.svelte.js";
+    import { org, sendInvite, cancelInvite, removeMember, leaveMerge, showNotice, deleteEvent, disconnectOrgStream } from "$lib/org.svelte.js";
     import InvitesReceived from "./InvitesReceived.svelte";
 
     let message = $state("");
@@ -85,6 +86,18 @@
         confirming = null;
         await run(leaveMerge, "You left. You're back on your own event.");
         if (!error) showNotice("You left. You're back on your own event.");
+    }
+
+    // Deleting is permanent: the event's code, name and content go, other organizers go back to
+    // their own events, and this console signs out (signing in again starts a fresh event).
+    async function removeEvent() {
+        confirming = null;
+        await run(deleteEvent, "");
+        if (error) return;
+        disconnectOrgStream();
+        localStorage.removeItem("creds");
+        localStorage.removeItem("cityName");
+        window.location.replace(resolve("/"));
     }
 
     const avatar = (slack) => `https://cachet.hackclub.com/users/${slack}/r`;
@@ -197,6 +210,23 @@
                 <p class="hint">Removed organizers go back to their own event.</p>
             {/if}
         </section>
+
+        {#if isOwner}
+            <section class="block">
+                <h3>Delete event</h3>
+                <p class="hint">Removes this event's attendee code, name and everything posted. Attendees are disconnected, other organizers go back to their own events, and you're signed out. This can't be undone.</p>
+                <div>
+                    {#if confirming === "delete"}
+                        <span class="row-confirm">
+                            <button class="btn btn-small btn-danger" onclick={removeEvent} disabled={busy}>Delete for good</button>
+                            <button class="btn btn-small btn-quiet" onclick={() => (confirming = null)}>Cancel</button>
+                        </span>
+                    {:else}
+                        <button class="btn btn-small btn-destructive" onclick={() => (confirming = "delete")} disabled={busy}>Delete event…</button>
+                    {/if}
+                </div>
+            </section>
+        {/if}
     {/if}
 </div>
 

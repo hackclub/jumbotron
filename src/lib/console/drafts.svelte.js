@@ -1,14 +1,14 @@
 // Draft content for each console row. Drafts live outside the row components so a row can be
 // collapsed without losing edits, and so the "Live now" strip and row badges can read them.
 
-import { liveshareData, publish, hooks, isPending, LIVE_KEYS } from "$lib/liveshare.svelte.js";
+import { liveshareData, publish, hooks, isPending, LIVE_KEYS, STORED_KEYS } from "$lib/liveshare.svelte.js";
 import { ANNOUNCEMENTS_MAX, newAnnouncementId, announcementsOf } from "$lib/announcements.js";
 import { parseClock, toAt, formatClock, prefersHour12 } from "$lib/time.js";
 import { drivePreviewLink, youtubeId, youtubeWatchUrl, normalizeUrl } from "$lib/links.js";
 
 // `color` is the leaf color for that kind of content, shared by the console and attendee views.
 export const CONTENT = [
-    { key: "announcements", label: "Announcements", icon: "campaign", color: "var(--c-announcement)", hint: "Short messages at the top of every attendee's screen. The newest one is also on the big screen." },
+    { key: "announcements", label: "Announcements", icon: "campaign", color: "var(--c-announcement)", hint: "Short messages at the top of every attendee's screen. The newest few are also on the big screen." },
     { key: "event", label: "Up next", icon: "schedule", color: "var(--c-event)", hint: "The next thing on the schedule, with a live countdown." },
     { key: "file", label: "Slides or document", icon: "description", color: "var(--c-file)", hint: "A Google Drive file attendees can read at their own pace." },
     { key: "youtube", label: "YouTube video", icon: "smart_display", color: "var(--c-youtube)", hint: "A video attendees can open on their phone." },
@@ -82,11 +82,11 @@ export function applyRemotePacket(raw) {
     if (!data || typeof data !== "object") return;
     const list = announcementsOf(data);
     const next = { ...data, announcements: list.length ? list : null };
-    for (const key of LIVE_KEYS) {
+    for (const key of STORED_KEYS) {
         const value = next[key] || null;
         if (isPending(key)) continue;
         if (JSON.stringify(value) === JSON.stringify($state.snapshot(liveshareData[key]) ?? null)) continue;
-        const following = rowStatus(key) === "live" || rowStatus(key) === "";
+        const following = LIVE_KEYS.includes(key) && (rowStatus(key) === "live" || rowStatus(key) === "");
         liveshareData[key] = value;
         if (following) hydrateKey(key);
     }
@@ -102,7 +102,8 @@ export function buildValue(key) {
             const title = drafts.announcements.title.trim();
             const message = drafts.announcements.message.trim();
             if (!title && !message) return null;
-            const list = liveshareData.announcements || [];
+            // Posting while announcements are switched off brings the put-away ones back too.
+            const list = liveshareData.announcements || liveshareData.announcementsHidden || [];
             const editing = drafts.announcements.editing;
             if (editing && list.some((a) => a.id === editing)) {
                 return list.map((a) => (a.id === editing ? { ...a, title, message, updatedAt: Date.now() } : a));

@@ -40,6 +40,10 @@ export const undoState = $state({
 
 export const LIVE_KEYS = ["announcements", "event", "file", "youtube", "website"];
 
+// Everything the console keeps in the packet: what's showing, plus the announcements put away
+// while their switch is off (so turning it back on brings them all back).
+export const STORED_KEYS = [...LIVE_KEYS, "announcementsHidden"];
+
 export function liveItems() {
     return LIVE_KEYS.filter((key) => liveshareData[key]);
 }
@@ -59,7 +63,7 @@ export async function updateAPI(keys) {
     if (!internal.initComplete) return false;
 
     for (const key of Array.isArray(keys) ? keys : []) pendingKeys.add(key);
-    const sending = pendingKeys.size ? [...pendingKeys] : [...LIVE_KEYS];
+    const sending = pendingKeys.size ? [...pendingKeys] : [...STORED_KEYS];
     // `announcement` (singular) is the newest one, for attendee tabs opened before the list.
     const changed = sending.includes("announcements") ? [...sending, "announcement"] : sending;
 
@@ -114,6 +118,11 @@ export async function publish(key, value) {
     liveshareData[key] = value;
 
     if (undoState.key === key) clearUndo();
+    // Showing announcements again (a new post, an undo, the switch) means none are put away.
+    if (key === "announcements" && liveshareData.announcementsHidden) {
+        liveshareData.announcementsHidden = null;
+        return updateAPI(["announcements", "announcementsHidden"]);
+    }
     return updateAPI([key]);
 }
 
@@ -124,20 +133,40 @@ export async function takeDown(key, label) {
     undoState.value = $state.snapshot(liveshareData[key]);
     undoState.label = label;
 
+    // Announcements are a history, not a draft that stays in the editor: put the list away
+    // instead of losing it, so the switch can bring it back.
+    if (key === "announcements") {
+        liveshareData.announcementsHidden = $state.snapshot(liveshareData.announcements);
+        liveshareData.announcements = null;
+        return updateAPI(["announcements", "announcementsHidden"]);
+    }
+
     liveshareData[key] = null;
     return updateAPI([key]);
 }
 
+// Switches announcements back on with everything that was showing when they were switched off.
+export async function showHiddenAnnouncements() {
+    const list = liveshareData.announcementsHidden;
+    if (!Array.isArray(list) || !list.length) return false;
+    return publish("announcements", $state.snapshot(list));
+}
+
 // Removes one posted announcement. Undo puts the whole list back as it was.
+// While announcements are switched off this edits the put-away list instead (no undo: nothing
+// attendees see changed).
 export async function removeAnnouncement(id) {
-    const list = liveshareData.announcements || [];
+    const field = liveshareData.announcements ? "announcements" : "announcementsHidden";
+    const list = liveshareData[field] || [];
     if (!list.some((a) => a.id === id)) return;
-    undoState.key = "announcements";
-    undoState.value = $state.snapshot(list);
-    undoState.label = "Announcement";
+    if (field === "announcements") {
+        undoState.key = "announcements";
+        undoState.value = $state.snapshot(list);
+        undoState.label = "Announcement";
+    }
     const rest = list.filter((a) => a.id !== id);
-    liveshareData.announcements = rest.length ? rest : null;
-    return updateAPI(["announcements"]);
+    liveshareData[field] = rest.length ? rest : null;
+    return updateAPI([field]);
 }
 
 export async function undoTakeDown() {

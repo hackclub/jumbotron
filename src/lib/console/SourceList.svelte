@@ -1,7 +1,7 @@
 <script>
     // Left pane of the console: every kind of content, whether it's on attendee screens,
     // and a switch to show or hide it. Selecting a row opens it in the editor.
-    import { liveshareData, syncStatus, takeDown } from "$lib/liveshare.svelte.js";
+    import { liveshareData, syncStatus, takeDown, showHiddenAnnouncements } from "$lib/liveshare.svelte.js";
     import { CONTENT, buildValue, rowStatus, liveSummary, publishDraft } from "./drafts.svelte.js";
     import Switch from "$lib/components/Switch.svelte";
 
@@ -10,7 +10,12 @@
     let busy = $derived(syncStatus.state === "syncing");
     let liveCount = $derived(CONTENT.filter((c) => liveshareData[c.key]).length);
 
+    // Announcements switched off with the sidebar are kept, not deleted.
+    const hiddenCount = (key) => (key === "announcements" && !liveshareData.announcements ? liveshareData.announcementsHidden?.length ?? 0 : 0);
+
     function statusText(key) {
+        const hidden = hiddenCount(key);
+        if (hidden && rowStatus(key) === "") return `Switched off, ${hidden} saved`;
         switch (rowStatus(key)) {
             case "live": return liveSummary(key);
             case "edited": return key === "announcements" ? "Draft not posted yet" : "Edited, not published yet";
@@ -24,6 +29,7 @@
     function toggle(item, on) {
         if (!on) return takeDown(item.key, item.label);
         if (buildValue(item.key)) publishDraft(item.key);
+        else if (hiddenCount(item.key)) showHiddenAnnouncements();
         else onselect(item.key, { focus: true });
     }
 </script>
@@ -50,7 +56,7 @@
                     checked={live}
                     label="Show {item.label} to attendees"
                     disabled={busy}
-                    hidden={(!live && !buildValue(item.key))}
+                    hidden={!live && !buildValue(item.key) && !hiddenCount(item.key)}
                     onchange={(on) => toggle(item, on)}
                 />
             </li>

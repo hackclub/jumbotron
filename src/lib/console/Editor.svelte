@@ -1,7 +1,7 @@
 <script>
     // Middle pane of the console: edit one kind of content, then publish it.
     import { slide } from "svelte/transition";
-    import { liveshareData, syncStatus, takeDown, removeAnnouncement } from "$lib/liveshare.svelte.js";
+    import { liveshareData, syncStatus, takeDown, removeAnnouncement, showHiddenAnnouncements } from "$lib/liveshare.svelte.js";
     import { CONTENT, drafts, buildValue, draftError, rowStatus, isDirty, publishDraft, editAnnouncement, clearAnnouncementDraft } from "./drafts.svelte.js";
     import { formatClock, relativeToNow } from "$lib/time.js";
     import { stampOf } from "$lib/announcements.js";
@@ -17,7 +17,9 @@
     const STATUS = { live: "Showing now", edited: "Edited, not published", draft: "Not showing yet", "": "Not showing" };
     const ANNOUNCEMENT_STATUS = { ...STATUS, edited: "Draft not posted" };
 
-    let posted = $derived(key === "announcements" ? liveshareData.announcements || [] : []);
+    // Switched-off announcements are kept (not shown to attendees) so they can come back.
+    let hiddenAll = $derived(key === "announcements" && !liveshareData.announcements && !!liveshareData.announcementsHidden?.length);
+    let posted = $derived(key === "announcements" ? liveshareData.announcements || liveshareData.announcementsHidden || [] : []);
     let editing = $derived(key === "announcements" ? drafts.announcements.editing : null);
     let headline = $state();
 
@@ -109,7 +111,9 @@
             {#if editing}
                 <button class="btn btn-quiet" onclick={clearAnnouncementDraft}>Cancel edit</button>
             {:else if live}
-                <button class="btn btn-destructive" disabled={busy} onclick={() => takeDown(key, item.label)}>Take all down</button>
+                <button class="btn btn-destructive" disabled={busy} onclick={() => takeDown(key, item.label)}>Hide all</button>
+            {:else if hiddenAll}
+                <button class="btn" disabled={busy} onclick={showHiddenAnnouncements}>Show again</button>
             {/if}
         {:else if live}
             <button class="btn btn-primary" disabled={busy || !isDirty(key) || !buildValue(key)} onclick={onPublish}>Update</button>
@@ -121,8 +125,10 @@
 
     {#if key === "announcements" && posted.length}
         <section class="posted" aria-labelledby="posted-heading">
-            <h3 id="posted-heading">Posted <span class="count">{posted.length}</span></h3>
-            <p class="hint">Newest first. Attendees see all of these; the big screen shows the newest.</p>
+            <h3 id="posted-heading">{hiddenAll ? "Hidden" : "Posted"} <span class="count">{posted.length}</span></h3>
+            <p class="hint">{hiddenAll
+                ? "Announcements are switched off, so attendees don't see these. Show them again, or post a new one to bring them all back."
+                : "Newest first. Attendees see all of these; the big screen shows the newest, with the next two under it."}</p>
             <ul>
                 {#each posted as a (a.id)}
                     {@const stamp = stampOf(a)}

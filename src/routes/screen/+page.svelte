@@ -28,7 +28,7 @@
     let pairing = $state(false);
     let connected = $state(false);
     let cityName = $state("");
-    let content = $state({ announcement: null, event: null, hour12: undefined });
+    let content = $state({ announcement: null, earlier: [], event: null, hour12: undefined });
     let demo = $state({ enabled: false, board: true, screenCode: null, presenter: null });
     let playing = $state(false);   // the presenter's video has frames
     let muted = $state(false);     // the browser refused sound until someone clicks
@@ -53,6 +53,8 @@
     let joinLink = $derived(`jumbotron.hackclub.com/?code=${attendeeCode ?? internal.code ?? ""}`);
     let presenter = $derived(demo.enabled ? demo.presenter : null);
     let board = $derived(demo.board !== false);
+    // Earlier announcements shown under the newest one on the big screen.
+    const SCREEN_EARLIER = 2;
     // Harpa plays its own music, which would talk over a live presenter: it's unloaded while
     // someone presents and reloads afterwards (harpa picks up where it left off).
     let showHarpa = $derived(harpa && !presenter?.live);
@@ -67,9 +69,12 @@
                 if (payload.cityName) cityName = payload.cityName;
                 if (payload.code) attendeeCode = payload.code;
                 const data = typeof payload.data === "string" ? JSON.parse(payload.data) : payload.data;
-                // The big screen shows only the newest announcement; attendees get the rest.
+                // The big screen shows the newest announcement in full and a couple of earlier
+                // ones as single lines under it; attendees get the whole list.
+                const list = announcementsOf(data);
                 content = {
-                    announcement: announcementsOf(data)[0] || null,
+                    announcement: list[0] || null,
+                    earlier: list.slice(1, 1 + SCREEN_EARLIER),
                     event: data?.event || null,
                     hour12: typeof data?.event?.hour12 === "boolean" ? data.event.hour12 : undefined
                 };
@@ -501,6 +506,17 @@
                         {#if stamp}<span class="stamp">· {stamp.verb} <time datetime={stamp.iso}>{stamp.text}</time></span>{/if}</p>
                     {#if content.announcement.title}<h2>{content.announcement.title}</h2>{/if}
                     {#if content.announcement.message}<p class="body">{content.announcement.message}</p>{/if}
+                    {#if content.earlier.length}
+                        <ul class="earlier" aria-label="Earlier announcements">
+                            {#each content.earlier as a (a.id)}
+                                {@const s = stampOf(a, content.hour12)}
+                                <li>
+                                    {#if s}<time datetime={s.iso}>{s.text}</time>{/if}
+                                    <span>{a.title || a.message}</span>
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
                 </section>
             {/if}
 
@@ -623,6 +639,12 @@
     .card h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
     .card .body { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
     .rel { color: var(--ink-3); }
+
+    /* Earlier announcements: one line each under the newest, so several fit without crowding it */
+    .earlier { list-style: none; margin: 1.2vh 0 0; padding: 1.2vh 0 0; border-top: 1px solid var(--line); display: grid; gap: 0.6vh; }
+    .earlier li { display: flex; align-items: baseline; gap: 0.8em; min-width: 0; font-size: clamp(1.1rem, 2vw, 2.6rem); color: var(--ink-2); }
+    .earlier time { flex: none; color: var(--ink-3); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .earlier span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 
     .airplay {
         justify-self: center;

@@ -3,7 +3,7 @@
     import { onMount, tick } from "svelte";
     import { fade, slide } from "svelte/transition";
     import { eventName } from "$lib/event";
-    import { internal, liveshareData, LIVE_KEYS } from "$lib/liveshare.svelte.js";
+    import { internal, liveshareData, STORED_KEYS } from "$lib/liveshare.svelte.js";
     import { announcementsOf } from "$lib/announcements.js";
     import { CONTENT, hydrateDrafts, resetDrafts, applyRemotePacket } from "$lib/console/drafts.svelte.js";
     import { API, org, connectOrgStream, disconnectOrgStream } from "$lib/org.svelte.js";
@@ -87,7 +87,7 @@
         let synced = null;
         try { synced = typeof data.data === "string" ? JSON.parse(data.data) : data.data; } catch {}
         if (switching) resetDrafts();
-        for (const key of LIVE_KEYS) {
+        for (const key of STORED_KEYS) {
             liveshareData[key] = (synced && synced[key]) || null;
         }
         // Packets from before announcements were a list carry just one.
