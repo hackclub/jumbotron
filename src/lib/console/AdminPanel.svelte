@@ -15,9 +15,13 @@
     let eventsJson = $state("");
     let loadedJson = $state("");
     let bannedList = $state([]);
+    let permanentBans = $state([]);     // set by the server's environment; can't be lifted here
+    let restrictions = $state({});      // slack -> ["organize" | "host"]
+    let kickTarget = $state("");
+    let restrictTarget = $state("");
     let banTarget = $state("");
     let unbanTarget = $state("");
-    let confirming = $state(null); // "ban" | "save"
+    let confirming = $state(null); // "ban" | "kick" | "save"
     let message = $state({ kind: "", text: "" });
     let loading = $state(false);
 
@@ -46,6 +50,8 @@
             const banRes = await authedPost("/getBans");
             const banData = await banRes.json().catch(() => ({}));
             try { bannedList = banRes.ok && banData.list ? JSON.parse(banData.list) : []; } catch { bannedList = []; }
+            permanentBans = banRes.ok && Array.isArray(banData.permanent) ? banData.permanent : [];
+            restrictions = banRes.ok && banData.restrictions && typeof banData.restrictions === "object" ? banData.restrictions : {};
         } catch {
             say("error", "Network error while loading events.");
         } finally {
@@ -85,6 +91,27 @@
         if (await post("/unbanEvent", { unbanSlack: id }, `Unbanned ${id}.`)) { unbanTarget = ""; load(); }
     }
 
+    // Signs them out everywhere without banning; they can sign in again.
+    async function kick() {
+        confirming = null;
+        const id = kickTarget.trim().toUpperCase();
+        if (await post("/kickUser", { slack: id }, `Signed ${id} out.`)) kickTarget = "";
+    }
+
+    // Partial bans: "organize" (someone else's event) or "host" (running any event).
+    const SCOPES = [
+        { key: "organize", label: "Organizing other events", sub: "Can't be added as an organizer; removed from any event they help with" },
+        { key: "host", label: "Running events", sub: "Can sign in, but can't publish, rename, run demo time, pair screens or invite" }
+    ];
+    const scopeLabel = (key) => SCOPES.find((x) => x.key === key)?.label ?? key;
+
+    async function restrict(slack, scope, restricted) {
+        slack = slack.trim().toUpperCase();
+        if (!slack) return;
+        const verb = restricted ? "Restricted" : "Lifted";
+        if (await post("/restrictUser", { slack, scope, restricted }, `${verb} ${scopeLabel(scope).toLowerCase()} for ${slack}.`)) load();
+    }
+
     async function save() {
         confirming = null;
         if (await post("/setEvents", { items: eventsJson }, "Events database replaced.")) loadedJson = eventsJson;
@@ -122,7 +149,7 @@
 <div class="admin">
     <div class="intro">
         <h2>Administrator</h2>
-        <p class="hint">Changes here affect every event. Bans revoke the organizer's access immediately.</p>
+        <p class="hint">Changes here affect every event. Bans and kicks revoke the organizer's access immediately.</p>
     </div>
 
     {#if message.text}
@@ -158,15 +185,70 @@
         </div>
 
         <div class="banned">
-            <span class="field-label">Banned ({bannedList.length})</span>
-            {#if bannedList.length}
+            <span class="field-label">Banned ({bannedList.length + permanentBans.filter((id) => !bannedList.includes(id)).length})</span>
+            {#if bannedList.length || permanentBans.length}
                 <ul>
+                    {#each permanentBans.filter((id) => !bannedList.includes(id)) as id}
+                        <li class="locked" title="Set by the server's environment. Remove it there and redeploy to lift it.">
+                            <span class="mono">{id}</span><span class="icon lock" translate="no" aria-label="Permanent">lock</span>
+                        </li>
+                    {/each}
                     {#each bannedList as id}
                         <li><span class="mono">{id}</span><button class="chip-x" aria-label="Unban {id}" onclick={() => unban(id)}><span class="icon" translate="no" aria-hidden="true">close</span></button></li>
                     {/each}
                 </ul>
             {:else}
                 <p class="hint">No one is banned.</p>
+            {/if}
+        </div>
+
+        <form class="inline" onsubmit={(e) => { e.preventDefault(); if (kickTarget.trim()) confirming = "kick"; }}>
+            <label class="field">
+                <span>Kick by Slack ID <em>signs them out everywhere, no ban</em></span>
+                <input class="input mono" bind:value={kickTarget} placeholder="U01ABC234" autocomplete="off" />
+            </label>
+            {#if confirming === "kick"}
+                <div class="confirm" role="group" aria-label="Confirm kick">
+                    <p>Sign <strong class="mono">{kickTarget.trim()}</strong> out of every console and big screen? They can sign in again.</p>
+                    <button type="button" class="btn btn-small btn-danger" onclick={kick}>Kick</button>
+                    <button type="button" class="btn btn-small btn-quiet" onclick={() => (confirming = null)}>Cancel</button>
+                </div>
+            {:else}
+                <button class="btn btn-small" disabled={!kickTarget.trim()}>Kick…</button>
+            {/if}
+        </form>
+    </section>
+
+    <section class="block">
+        <h3>Partial bans</h3>
+        <p class="hint">Keep someone signed in but stop them from one thing.</p>
+        <form class="inline" onsubmit={(e) => e.preventDefault()}>
+            <label class="field">
+                <span>Slack ID</span>
+                <input class="input mono" bind:value={restrictTarget} placeholder="U01ABC234" autocomplete="off" />
+            </label>
+            {#each SCOPES as scope}
+                <button type="button" class="btn btn-small" disabled={!restrictTarget.trim()} title={scope.sub}
+                    onclick={() => restrict(restrictTarget, scope.key, true)}>Ban from {scope.label.toLowerCase()}</button>
+            {/each}
+        </form>
+        <ul class="scopes">
+            {#each SCOPES as scope}
+                <li><strong>{scope.label}:</strong> {scope.sub}</li>
+            {/each}
+        </ul>
+        <div class="banned">
+            <span class="field-label">Restricted ({Object.keys(restrictions).length})</span>
+            {#if Object.keys(restrictions).length}
+                <ul>
+                    {#each Object.entries(restrictions) as [id, scopes] (id)}
+                        {#each scopes as scope (scope)}
+                            <li><span class="mono">{id}</span><span class="tag">{scopeLabel(scope)}</span><button class="chip-x" aria-label="Lift {scopeLabel(scope)} ban for {id}" onclick={() => restrict(id, scope, false)}><span class="icon" translate="no" aria-hidden="true">close</span></button></li>
+                        {/each}
+                    {/each}
+                </ul>
+            {:else}
+                <p class="hint">No partial bans.</p>
             {/if}
         </div>
     </section>
@@ -228,6 +310,11 @@
     .banned li { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 12px; border-radius: var(--radius-pill); background: var(--surface-sunken); }
     .chip-x { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: none; color: var(--ink-2); cursor: pointer; }
     .chip-x:hover { background: var(--line); }
+    .banned li.locked { padding-right: 12px; }
+    .lock { font-size: 1rem; color: var(--ink-3); }
+    .tag { color: var(--ink-3); font-size: 0.85rem; }
+    .scopes { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 0.88rem; display: grid; gap: 2px; }
+    .field em { font-style: normal; color: var(--ink-3); font-weight: 400; }
     .json { min-height: 260px; font-size: 0.85rem; }
     .json.short { min-height: 150px; }
     .actions { display: flex; flex-wrap: wrap; gap: 8px; }

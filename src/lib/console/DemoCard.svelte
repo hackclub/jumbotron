@@ -3,7 +3,7 @@
     // turn on demo time so attendees can share their screen to it.
     import { resolve } from "$app/paths";
     import { slide } from "svelte/transition";
-    import { demo, setDemos, setBoard, setMirror, stopPresenter, approveQueued, removeQueued, createPairCode, unpairScreens } from "$lib/org.svelte.js";
+    import { demo, setDemos, setBoard, setMirror, stopPresenter, approveQueued, removeQueued, blockPresenter, unblockPresenter, createPairCode, unpairScreens } from "$lib/org.svelte.js";
     import Switch from "$lib/components/Switch.svelte";
 
     let busy = $state(false);
@@ -137,6 +137,9 @@
                         <span>{demo.presenter.live ? "is on the big screen" : "is choosing what to share"}</span>
                     </span>
                     <button class="btn btn-small btn-destructive" disabled={busy} onclick={() => run(stopPresenter)}>Stop</button>
+                    <button class="btn btn-small btn-quiet" disabled={busy} aria-label={`Block ${demo.presenter.name} from demo time`}
+                        title="Stops them and keeps them from joining again"
+                        onclick={() => run(() => blockPresenter(demo.presenter.id))}>Block</button>
                 </div>
             {/if}
 
@@ -158,6 +161,9 @@
                                     onclick={() => run(() => approveQueued(q.id))}>Approve</button>
                                 <button class="btn btn-small btn-quiet" disabled={busy} aria-label={`Remove ${q.name} from the queue`}
                                     onclick={() => run(() => removeQueued(q.id))}>Remove</button>
+                                <button class="btn btn-small btn-quiet" disabled={busy} aria-label={`Block ${q.name} from demo time`}
+                                    title="Removes them and keeps them from joining again"
+                                    onclick={() => run(() => blockPresenter(q.id))}>Block</button>
                             </li>
                         {/each}
                     </ol>
@@ -165,6 +171,23 @@
                 {/if}
             </div>
         {/if}
+    {/if}
+
+    {#if demo.blocked?.length}
+        <div class="queue" transition:slide={{ duration: 180 }}>
+            <p class="label">Blocked from demo time ({demo.blocked.length})</p>
+            <ol>
+                {#each demo.blocked as b (b.id)}
+                    <li>
+                        <span class="initial" aria-hidden="true">{b.name[0]}</span>
+                        <span class="who"><strong>{b.name}</strong></span>
+                        <button class="btn btn-small btn-quiet" disabled={busy} aria-label={`Unblock ${b.name}`}
+                            onclick={() => run(() => unblockPresenter(b.id))}>Unblock</button>
+                    </li>
+                {/each}
+            </ol>
+            <p class="hint">Blocked by the browser they joined from. Someone determined can get around it with another browser.</p>
+        </div>
     {/if}
 
     {#if error}<p class="error-text" role="alert">{error}</p>{/if}

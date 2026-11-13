@@ -24,7 +24,8 @@ export const demo = $state({
     paired: false,   // a venue computer has been paired (or a pairing code made) for this event
     presenter: null,
     mirror: false,   // the presenter's screen also goes to attendees' devices (as snapshots)
-    queue: []        // [{ id, name, slack, connected }] waiting for an organizer to approve them
+    queue: [],       // [{ id, name, slack, connected }] waiting for an organizer to approve them
+    blocked: []      // [{ id, name }] presenters an organizer blocked from demo time
 });
 
 export function applyDemo(next) {
@@ -77,6 +78,9 @@ export function describeMergeEvent(reason, state, prev) {
             return wasBridged ? "" : `${nameOf(goneFrom(state.members, prev && prev.members))} was removed as an organizer.`;
         case "host_removed":
             return "The event you helped organize was removed by an administrator. You're back on your own event.";
+        case "member_restricted":
+            if (wasBridged && state.role === "root") return `An administrator removed you as an organizer of ${nameOf(prev.root)}'s event. You're back on your own event.`;
+            return wasBridged ? "" : `${nameOf(goneFrom(state.members, prev && prev.members))} was removed as an organizer by an administrator.`;
         case "host_deleted":
             return "The owner deleted the event you helped organize. You're back on your own event.";
         case "invite_sent": {
@@ -332,3 +336,6 @@ export const setMirror = (mirror) => demoPost("/demoSet", { mirror });
 export const stopPresenter = () => demoPost("/demoStop");
 export const approveQueued = (id) => demoPost("/demoApprove", { id });
 export const removeQueued = (id) => demoPost("/demoRemove", { id });
+// Takes a presenter off the big screen or out of the queue and keeps them from joining again.
+export const blockPresenter = (id) => demoPost("/demoBlock", { id });
+export const unblockPresenter = (id) => demoPost("/demoUnblock", { id });

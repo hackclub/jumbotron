@@ -39,6 +39,7 @@
         demos_off: "Demo time is over.",
         replaced: "An organizer gave the big screen to someone else. Join the queue again if you still want to present.",
         removed: "An organizer took you out of the queue.",
+        blocked: "An organizer removed you from demo time.",
         timeout: "That took a little too long. Join the queue again to try again.",
         lost: "Lost connection to the big screen.",
         closed: "Your screenshare ended."
