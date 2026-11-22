@@ -129,10 +129,11 @@ function validateEvents(obj) {
     return null;
 }
 
-// Validates code/password from the query (GET) or body (POST).
+// Validates code/password from the POST body. Credentials are never read from the URL, where
+// proxies and browser history would keep them.
 // Sends the error response itself and returns null on failure, otherwise returns the code.
 function authOrganizer(req, res) {
-    const src = (req.method === "GET" ? req.query : req.body) || {};
+    const src = req.body || {};
     const code = src.code != null ? String(src.code) : "";
     const password = src.password;
     if (!code || !password) {
@@ -1566,7 +1567,7 @@ async function allEvents(req, res) {
     logAs(code, "Requested all events through admin");
     return res.status(200).json({ list: items });
 }
-api.route("/allEvents").get(allEvents).post(allEvents);
+api.post("/allEvents", allEvents);
 
 
 api.post("/setEvents", async function (req, res) {
@@ -1692,7 +1693,7 @@ async function getBans(req, res) {
 
     return res.status(200).json({ list: JSON.stringify(banned) });
 }
-api.route("/getBans").get(getBans).post(getBans);
+api.post("/getBans", getBans);
 
 async function getAdmins(req, res) {
     const code = authOrganizer(req, res);
@@ -1700,7 +1701,7 @@ async function getAdmins(req, res) {
 
     return res.status(200).json({admins: admins});
 }
-api.route("/getAdmins").get(getAdmins).post(getAdmins);
+api.post("/getAdmins", getAdmins);
 
 // --- Harpa (lo-fi music on the big screen) ---
 //
