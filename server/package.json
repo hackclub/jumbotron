@@ -1,0 +1,27 @@
+{
+  "name": "jumbotron",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lynn89-eefje/jumbotron-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lynn89-eefje/jumbotron-backend/issues"
+  },
+  "homepage": "https://github.com/lynn89-eefje/jumbotron-backend#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "validator": "^13.15.35"
+  }
+}
