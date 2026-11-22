@@ -1,5 +1,6 @@
-// VITE_API points a local build at a local backend.
-export const API = import.meta.env.VITE_API || "https://api.jumbotron.hackclub.com";
+// The API is served by the same server as the frontend, under /api (in dev, Vite proxies /api
+// to it). VITE_API points a build at an API on another origin instead.
+export const API = import.meta.env.VITE_API || "/api";
 export const AUTH_URL = "https://auth.hackclub.com/oauth/authorize?client_id=e86d4d7eec9c546e6c4700388d4fea7f&redirect_uri=https%3A%2F%2Fjumbotron.hackclub.com%2Fcallback&response_type=code&scope=name+verification_status+slack_id";
 
 
