@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import cors from "cors";
 import crypto from "crypto";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 dotenv.config();
 
 let admins = process.env.ADMINS || "U08EMT46G3V";
@@ -1735,6 +1737,23 @@ api.use(function (req, res) {
 });
 
 app.use("/api", api);
+
+// --- Frontend ---
+//
+// The SvelteKit build (adapter-static) is served from ../build. Hashed assets under
+// _app/immutable never change, so browsers may cache them for good. Every other GET falls back
+// to 404.html, the SPA shell, so client-side routes like /nyc, /staff and /callback load.
+
+const buildDir = fileURLToPath(new URL("../build", import.meta.url));
+if (fs.existsSync(buildDir)) {
+    app.use("/_app/immutable", express.static(path.join(buildDir, "_app/immutable"), { immutable: true, maxAge: "1y" }));
+    app.use(express.static(buildDir));
+    app.get("/{*path}", function (req, res) {
+        res.sendFile(path.join(buildDir, "404.html"));
+    });
+} else {
+    console.warn(`No frontend build at ${buildDir}; serving the API only. Run \`npm run build\` first.`);
+}
 
 // JSON errors only: Express's default handler answers with HTML and, outside
 // NODE_ENV=production, the stack trace.
