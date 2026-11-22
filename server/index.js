@@ -1746,7 +1746,11 @@ app.use("/api", api);
 
 const buildDir = fileURLToPath(new URL("../build", import.meta.url));
 if (fs.existsSync(buildDir)) {
-    app.use("/_app/immutable", express.static(path.join(buildDir, "_app/immutable"), { immutable: true, maxAge: "1y" }));
+    // A missing hashed asset (an old chunk after a deploy) is a real 404 rather than the SPA
+    // shell, so the client notices and reloads.
+    app.use("/_app/immutable",
+        express.static(path.join(buildDir, "_app/immutable"), { immutable: true, maxAge: "1y" }),
+        (req, res) => res.sendStatus(404));
     app.use(express.static(buildDir));
     app.get("/{*path}", function (req, res) {
         res.sendFile(path.join(buildDir, "404.html"));
