@@ -1,0 +1,15 @@
+node_modules
+build
+.svelte-kit
+.git
+.github
+.vscode
+.claude
+ref
+specs
+.env
+.env.*
+!.env.example
+*.db
+Dockerfile
+.dockerignore
