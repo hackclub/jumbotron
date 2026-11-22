@@ -3,9 +3,13 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"engines": {
+		"node": ">=22"
+	},
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "concurrently -k -n api,web -c blue,green \"node --watch server/index.js\" \"vite dev\"",
 		"build": "vite build",
+		"start": "node server/index.js",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''"
 	},
@@ -13,10 +17,15 @@
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.70.2",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
+		"concurrently": "^10.0.7",
 		"svelte": "^5.56.9",
 		"vite": "^8.2.1"
 	},
 	"dependencies": {
-		"@vercel/analytics": "^2.0.1"
+		"@vercel/analytics": "^2.0.1",
+		"cors": "^2.8.6",
+		"dotenv": "^17.4.2",
+		"express": "^5.2.1",
+		"validator": "^13.15.35"
 	}
 }
