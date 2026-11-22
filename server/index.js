@@ -14,7 +14,11 @@ console.log("Set admin list", admins)
 let banned = [];
 
 const app = express();
-app.set("trust proxy", "loopback");
+// Which proxies to trust for req.ip (used to tell demo presenters and pairing screens apart).
+// Behind a reverse proxy that isn't on loopback (e.g. in Docker), set TRUST_PROXY to its address
+// or subnet, or to a hop count. See https://expressjs.com/en/guide/behind-proxies.html
+const trustProxy = process.env.TRUST_PROXY || "loopback";
+app.set("trust proxy", /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy === "true" ? true : trustProxy === "false" ? false : trustProxy);
 // Every API route lives on this router, mounted at /api (see the bottom of the file). Inside it,
 // req.path is relative to the mount point, so /api/demoFrame shows up here as /demoFrame.
 const api = express.Router();
@@ -1771,6 +1775,10 @@ app.use(function (err, req, res, next) {
 
 const port = process.env.PORT || 3000;
 
-app.listen(port, function() {
+app.listen(port, function (err) {
+    if (err) {
+        console.error(`Could not listen on port ${port}:`, err.message);
+        process.exit(1);
+    }
     console.log(`Jumbotron running on port ${port}`);
 });
