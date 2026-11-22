@@ -13,10 +13,13 @@ let banned = [];
 
 const app = express();
 app.set("trust proxy", "loopback");
+// Every API route lives on this router, mounted at /api (see the bottom of the file). Inside it,
+// req.path is relative to the mount point, so /api/demoFrame shows up here as /demoFrame.
+const api = express.Router();
 // /demoFrame carries a JPEG in its JSON body, so it gets its own, larger limit (see below).
 const parseJson = express.json();
-app.use((req, res, next) => (req.path === "/demoFrame" ? next() : parseJson(req, res, next)));
-app.use(cors({
+api.use((req, res, next) => (req.path === "/demoFrame" ? next() : parseJson(req, res, next)));
+api.use(cors({
     origin: [
         "https://symmetrical-doodle-69qgr7v97j76f59j7-5173.app.github.dev",
         "https://jumbotron.hackclub.com",
@@ -496,7 +499,7 @@ async function fetchHcaIdentity(code) {
     }
 }
 
-app.post("/genToken", async function(req, res) {
+api.post("/genToken", async function(req, res) {
     const { code } = req.body || {};
     if (!code || typeof code !== "string") {
         return res.status(400).json({ error: "Missing code" });
@@ -550,7 +553,7 @@ app.post("/genToken", async function(req, res) {
     });
 });
 
-app.post("/initEvent", async function (req, res) {
+api.post("/initEvent", async function (req, res) {
     const code = authOrganizer(req, res);
     if (code == null) return;
     const { cityName } = req.body;
@@ -585,7 +588,7 @@ function parsePacket(raw) {
     }
 }
 
-app.post("/sendPacket", async function (req, res) {
+api.post("/sendPacket", async function (req, res) {
     const code = authOrganizer(req, res);
     if (code == null) return;
     const { packet, changed, tab } = req.body;
@@ -621,7 +624,7 @@ app.post("/sendPacket", async function (req, res) {
     return res.status(200).json({ message: `Updated information${count ? ` and broadcasted to ${count} users` : ""}`, packet: next });
 });
 
-app.get("/getPacket", async function (req, res) {
+api.get("/getPacket", async function (req, res) {
     const code = req.query.code != null ? String(req.query.code) : "";
     if (!code) {
         return res.status(400).json({ error: "Missing event code" });
@@ -636,7 +639,7 @@ app.get("/getPacket", async function (req, res) {
     return res.status(200).json(participantPayload(code));
 });
 
-app.get("/getSession", async function(req, res) {
+api.get("/getSession", async function(req, res) {
     const code = req.query.code != null ? String(req.query.code) : "";
     if (!code) {
         return res.status(400).json({ error: "No event code provided" });
@@ -671,7 +674,7 @@ app.get("/getSession", async function(req, res) {
 const STREAM_TICKET_TTL = 30 * 1000;
 let streamTickets = new Map();   // ticket -> { code, expires }
 
-app.post("/streamTicket", async function (req, res) {
+api.post("/streamTicket", async function (req, res) {
     const code = authScreen(req, res);
     if (code == null) return;
     const now = Date.now();
@@ -716,7 +719,7 @@ function redeemTicket(req, res, { allowScreen = false } = {}) {
     return code;
 }
 
-app.get("/orgStream", async function (req, res) {
+api.get("/orgStream", async function (req, res) {
     const code = redeemTicket(req, res);
     if (code == null) return;
 
@@ -737,7 +740,7 @@ app.get("/orgStream", async function (req, res) {
 
 // An organizer deletes their own event: its code, name, content, big screen and invites. Other
 // organizers go back to their own events; signing in again starts a fresh event.
-app.post("/deleteEvent", async function (req, res) {
+api.post("/deleteEvent", async function (req, res) {
     const code = authOrganizer(req, res);
     if (code == null) return;
     logAs(code, "Deleted their event");
@@ -745,13 +748,13 @@ app.post("/deleteEvent", async function (req, res) {
     return res.status(200).json({ message: "Event deleted" });
 });
 
-app.post("/mergeState", async function (req, res) {
+api.post("/mergeState", async function (req, res) {
     const code = authOrganizer(req, res);
     if (code == null) return;
     return res.status(200).json(mergeState(code));
 });
 
-app.post("/unmerge", async function (req, res) {
+api.post("/unmerge", async function (req, res) {
     const code = authOrganizer(req, res);
     if (code == null) return;
 
@@ -776,7 +779,7 @@ app.post("/unmerge", async function (req, res) {
 
 const INVITES_MAX = 25;
 
-app.post("/mergeInvite", async function (req, res) {
+api.post("/mergeInvite", async function (req, res) {
     const code = authOrganizer(req, res);
     if (code == null) return;
     const slack = req.body.slack != null ? String(req.body.slack).trim().toUpperCase() : "";
@@ -809,7 +812,7 @@ app.post("/mergeInvite", async function (req, res) {
     return res.status(200).json(mergeState(code));
 });
 
-app.post("/cancelMergeInvite", async function (req, res) {
+api.post("/cancelMergeInvite", async function (req, res) {
     const code = authOrganizer(req, res);
     if (code == null) return;
     const slack = req.body.slack != null ? String(req.body.slack).trim().toUpperCase() : "";
@@ -824,7 +827,7 @@ app.post("/cancelMergeInvite", async function (req, res) {
     return res.status(200).json(mergeState(code));
 });
 
-app.post("/respondMergeInvite", async function (req, res) {
+api.post("/respondMergeInvite", async function (req, res) {
     const code = authOrganizer(req, res);
     if (code == null) return;
     const host = req.body.host != null ? String(req.body.host) : "";
@@ -1042,13 +1045,13 @@ function kickAttendee(slack) {
     }
 }
 
-app.post("/demoState", async function (req, res) {
+api.post("/demoState", async function (req, res) {
     const code = authEvent(req, res);
     if (code == null) return;
     return res.status(200).json({ demo: demoState(code) });
 });
 
-app.post("/demoSet", async function (req, res) {
+api.post("/demoSet", async function (req, res) {
     const code = authEvent(req, res);
     if (code == null) return;
     const { enabled, board, mirror } = req.body;
@@ -1112,7 +1115,7 @@ function clearFrame(code) {
     pushToParticipants(groupCodes(code));
 }
 
-app.post("/demoFrame", express.json({ limit: "600kb" }), async function (req, res) {
+api.post("/demoFrame", express.json({ limit: "600kb" }), async function (req, res) {
     const code = authEventScreen(req, res);
     if (code == null) return;
     const d = demos.get(code);
@@ -1135,7 +1138,7 @@ app.post("/demoFrame", express.json({ limit: "600kb" }), async function (req, re
 });
 
 // Public, like /getSession: anyone with the event code can watch the big screen's demo.
-app.get("/demoFrame", async function (req, res) {
+api.get("/demoFrame", async function (req, res) {
     const code = req.query.code != null ? rootOf(req.query.code) : "";
     const d = getToken(code) ? demos.get(code) : null;
     if (!mirrorState(code)) return res.status(404).json({ error: "Nothing is being mirrored" });
@@ -1176,7 +1179,7 @@ function dropViewers(code, reason) {
 
 const validViewer = (id) => typeof id === "string" && /^[A-Za-z0-9-]{8,64}$/.test(id);
 
-app.get("/mirrorStream", async function (req, res) {
+api.get("/mirrorStream", async function (req, res) {
     const code = req.query.code != null ? rootOf(req.query.code) : "";
     const viewer = req.query.viewer;
     if (!getToken(code) || !validViewer(viewer)) return res.status(400).json({ error: "Bad request" });
@@ -1200,7 +1203,7 @@ app.get("/mirrorStream", async function (req, res) {
 });
 
 // A watcher's handshake message (their offer or ICE candidates) on its way to the projector.
-app.post("/mirrorSignal", async function (req, res) {
+api.post("/mirrorSignal", async function (req, res) {
     const body = req.body || {};
     const code = body.code != null ? rootOf(body.code) : "";
     const d = getToken(code) ? demos.get(code) : null;
@@ -1210,7 +1213,7 @@ app.post("/mirrorSignal", async function (req, res) {
     return res.status(200).json({ delivered: true });
 });
 
-app.post("/demoStop", async function (req, res) {
+api.post("/demoStop", async function (req, res) {
     const code = authEvent(req, res);
     if (code == null) return;
     const d = demos.get(code);
@@ -1222,7 +1225,7 @@ app.post("/demoStop", async function (req, res) {
 });
 
 // Hands the big screen to someone in the queue. They still have to pick a window.
-app.post("/demoApprove", async function (req, res) {
+api.post("/demoApprove", async function (req, res) {
     const code = authEvent(req, res);
     if (code == null) return;
     const d = demos.get(code);
@@ -1256,7 +1259,7 @@ app.post("/demoApprove", async function (req, res) {
     return res.status(200).json({ demo: demoState(code) });
 });
 
-app.post("/demoRemove", async function (req, res) {
+api.post("/demoRemove", async function (req, res) {
     const code = authEvent(req, res);
     if (code == null) return;
     const d = demos.get(code);
@@ -1269,7 +1272,7 @@ app.post("/demoRemove", async function (req, res) {
 });
 
 // The projector tab. One per event: opening a second one takes over from the first.
-app.get("/screenStream", async function (req, res) {
+api.get("/screenStream", async function (req, res) {
     const opener = redeemTicket(req, res, { allowScreen: true });
     if (opener == null) return;
     const code = getRootCode(opener);
@@ -1300,7 +1303,7 @@ app.get("/screenStream", async function (req, res) {
 const DEMO_QUEUE_MAX = 50;
 
 // Joins the queue. Needs a typed name and the code on the big screen.
-app.post("/demoJoin", async function (req, res) {
+api.post("/demoJoin", async function (req, res) {
     const body = req.body || {};
     const code = body.code != null ? rootOf(body.code) : "";
     const screenCode = body.screenCode != null ? String(body.screenCode).trim() : "";
@@ -1368,7 +1371,7 @@ app.post("/demoJoin", async function (req, res) {
 // The presenter's feed, open from joining the queue until their turn ends:
 // { type: "queued", position }, { type: "approved" }, { type: "ready", restart } (start or
 // redo the handshake), { type: "signal", signal } and { type: "ended", reason }.
-app.get("/demoStream", async function (req, res) {
+api.get("/demoStream", async function (req, res) {
     const code = req.query.code != null ? rootOf(req.query.code) : "";
     const p = demoPresenter(code, req.query.token) || demoQueued(code, req.query.token);
     if (!p) {
@@ -1411,7 +1414,7 @@ app.get("/demoStream", async function (req, res) {
 });
 
 // The approved presenter has picked a window: start the handshake with the projector.
-app.post("/demoPicked", async function (req, res) {
+api.post("/demoPicked", async function (req, res) {
     const body = req.body || {};
     const code = body.code != null ? rootOf(body.code) : "";
     const p = demoPresenter(code, body.token);
@@ -1425,7 +1428,7 @@ app.post("/demoPicked", async function (req, res) {
     return res.status(200).json({ ok: true });
 });
 
-app.post("/demoLeave", async function (req, res) {
+api.post("/demoLeave", async function (req, res) {
     const body = req.body || {};
     const code = body.code != null ? rootOf(body.code) : "";
     if (demoPresenter(code, body.token)) {
@@ -1439,7 +1442,7 @@ app.post("/demoLeave", async function (req, res) {
 
 // Relays one handshake message. A presenter proves themselves with their token; anything
 // else must be the projector tab, which holds organizer credentials or a screen key.
-app.post("/demoSignal", async function (req, res) {
+api.post("/demoSignal", async function (req, res) {
     const body = req.body || {};
     if (!validSignal(body.signal)) {
         return res.status(400).json({ error: "Invalid signal" });
@@ -1492,7 +1495,7 @@ setInterval(() => {
     }
 }, 60 * 1000).unref();
 
-app.post("/screenPairCode", async function (req, res) {
+api.post("/screenPairCode", async function (req, res) {
     const code = authEvent(req, res);
     if (code == null) return;
     // One live pairing code per event: asking again replaces it.
@@ -1508,7 +1511,7 @@ app.post("/screenPairCode", async function (req, res) {
     return res.status(200).json({ pairCode, expires });
 });
 
-app.post("/screenPair", async function (req, res) {
+api.post("/screenPair", async function (req, res) {
     const pairCode = req.body && req.body.pairCode != null ? String(req.body.pairCode).replace(/\D/g, "") : "";
     const callerKey = `pair|${req.ip}`;
     if (recentFailures(callerKey).length >= 5 || recentFailures("pair").length >= 60) {
@@ -1527,7 +1530,7 @@ app.post("/screenPair", async function (req, res) {
     return res.status(200).json({ code: entry.code, screenKey: token.screenKey });
 });
 
-app.post("/screenUnpair", async function (req, res) {
+api.post("/screenUnpair", async function (req, res) {
     const code = authEvent(req, res);
     if (code == null) return;
     delete tokens[code].screenKey;
@@ -1561,10 +1564,10 @@ async function allEvents(req, res) {
     logAs(code, "Requested all events through admin");
     return res.status(200).json({ list: items });
 }
-app.route("/allEvents").get(allEvents).post(allEvents);
+api.route("/allEvents").get(allEvents).post(allEvents);
 
 
-app.post("/setEvents", async function (req, res) {
+api.post("/setEvents", async function (req, res) {
     const code = authAdmin(req, res);
     if (code == null) return;
     const { items } = req.body;
@@ -1629,7 +1632,7 @@ app.post("/setEvents", async function (req, res) {
 });
 
 
-app.post("/banEvent", async function (req, res) {
+api.post("/banEvent", async function (req, res) {
     const code = authAdmin(req, res);
     if (code == null) return;
     let { banSlack, banList } = req.body;
@@ -1668,7 +1671,7 @@ app.post("/banEvent", async function (req, res) {
     return res.status(200).json({ message: `Ban list updated and active sessions terminated.` });
 });
 
-app.post("/unbanEvent", async function (req, res) {
+api.post("/unbanEvent", async function (req, res) {
     const code = authAdmin(req, res);
     if (code == null) return;
     let { unbanSlack } = req.body;
@@ -1687,7 +1690,7 @@ async function getBans(req, res) {
 
     return res.status(200).json({ list: JSON.stringify(banned) });
 }
-app.route("/getBans").get(getBans).post(getBans);
+api.route("/getBans").get(getBans).post(getBans);
 
 async function getAdmins(req, res) {
     const code = authOrganizer(req, res);
@@ -1695,7 +1698,7 @@ async function getAdmins(req, res) {
 
     return res.status(200).json({admins: admins});
 }
-app.route("/getAdmins").get(getAdmins).post(getAdmins);
+api.route("/getAdmins").get(getAdmins).post(getAdmins);
 
 // --- Harpa (lo-fi music on the big screen) ---
 //
@@ -1707,7 +1710,7 @@ function harpaState(code) {
     return { enabled: harpaOn.has(code) };
 }
 
-app.post("/harpaSet", async function (req, res) {
+api.post("/harpaSet", async function (req, res) {
     const code = authEvent(req, res);
     if (code == null) return;
     const enabled = req.body && req.body.enabled;
@@ -1726,10 +1729,12 @@ app.post("/harpaSet", async function (req, res) {
     return res.status(200).json({ harpa: harpaState(code) });
 });
 
-// Keep this after every route: anything that reaches it is unknown.
-app.use(function (req, res) {
+// Keep this after every route: anything under /api that reaches it is unknown.
+api.use(function (req, res) {
     res.status(404).json({ error: "Not found" });
 });
+
+app.use("/api", api);
 
 // JSON errors only: Express's default handler answers with HTML and, outside
 // NODE_ENV=production, the stack trace.
